@@ -12,6 +12,7 @@ app.service('Models', function(ParseConnector, $q) {
 
         model.group = new ParseConnector.Model({
                 table: 'Book',
+                parse_update_delay: 0,
                 attributes: {
                         title: {}
                 }
@@ -19,6 +20,7 @@ app.service('Models', function(ParseConnector, $q) {
 
         model.chapter = new ParseConnector.Model({
                 table: 'Chapter',
+                parse_update_delay: 0,                
                 attributes: {
                         title: {}
                 }
