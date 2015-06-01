@@ -18,6 +18,17 @@ app.service('Models', function(ParseConnector, $q) {
                 console.log(model.book)
                 console.log(model.book.data);  
 
+                m = model.book.new({title:'sfklsd'});
+                m.save().then(function() {
+                        console.log("added")
+                })
+
+                m = model.book.data[1]
+                m.delete().then(function(){
+                        console.log("deleted")
+                });   
+
+
         })
 
         model.chapter = new ParseConnector.Model({

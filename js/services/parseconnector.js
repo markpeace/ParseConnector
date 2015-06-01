@@ -83,7 +83,7 @@ app.service('ParseConnector', function($q) {
                         var retrieve_cached_data = function () {                // retrieves cached data, and checks for an update
                                 _model.data=[]
 
-                                //window.localStorage.removeItem(_model.table)
+                                window.localStorage.removeItem(_model.table)
 
                                 var cached_data = JSON.parse(window.localStorage.getItem(_model.table)) || { last_retrieved: null, data: [] }
                                 cached_data.data.forEach(function(cached_record) {
@@ -212,7 +212,6 @@ app.service('ParseConnector', function($q) {
                                                         _newRecord.fetch(true).then(performSave)
                                                 }
                                         } else {                                //OTHERWISE CREATE A RECORD
-                                                console.log(_newRecord)
                                                 _newRecord.parseObject = new (Parse.Object.extend(_model.table))
                                                 performSave();
                                         }
@@ -290,7 +289,6 @@ app.service('ParseConnector', function($q) {
                                 getObject = function () {
                                         if(!_newRecord.parseObject) {                                                               
                                                 _newRecord.fetch(true).then(function() {
-                                                        console.log("m")
                                                         doDelete()
                                                 })
                                         } else {
@@ -300,6 +298,8 @@ app.service('ParseConnector', function($q) {
                                 }
 
                                 doDelete=function() {
+                                        
+                                        console.log("M:"+_newRecord.id);
 
                                         (new (Parse.Object.extend("pc_system"))).save({
                                                 target_id: _newRecord.id,
