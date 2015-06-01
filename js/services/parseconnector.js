@@ -111,7 +111,17 @@ app.service('ParseConnector', function($q) {
                                 query.find().then(function(parse_recordset) {
 
                                         parse_recordset.forEach(function(parse_record) {
-                                                _model.new(parse_record).fetch();
+                                                                                                
+                                                var existing_record = _model.filterBy({id:parse_record.id})
+                                                
+                                                if(existing_record.length>0) {
+                                                        existing_record=existing_record[0]
+                                                        existing_record.parseObject=parse_record
+                                                        existing_record.fetch()
+                                                } else {
+                                                        _model.new(parse_record).fetch();                                                        
+                                                }
+                                                
                                         })
 
                                         console.info("- Retrieved "+parse_recordset.length+" Parse records for "+_model.table)
@@ -161,15 +171,17 @@ app.service('ParseConnector', function($q) {
                                 })
                         } else if (preset.cid) {                        //A PARSE OBJECT HAS BEEN PASSED
                                 _newRecord.parseObject = preset
+                        } else {                                        //A BRAND NEW OBJECT HAS BEEN PASSED
+                                
                         }
 
                         _newRecord.fetch = function() {
                                 for(attribute in _model.attributes) {                                        
                                         if(_model.attributes.hasOwnProperty(attribute)) {
-                                                _newRecord[attribute] = preset.get(attribute)
+                                                _newRecord[attribute] = _newRecord.parseObject.get(attribute)
                                         }
                                 }
-                                _newRecord.id = preset.id
+                                _newRecord.id = _newRecord.parseObject.id
                                 _newRecord.last_retrieved = new Date().toISOString()
                         }
 
@@ -177,14 +189,17 @@ app.service('ParseConnector', function($q) {
                         return _newRecord
                 }
                 
-                _model.filterBy = function (options) {
-                        options=options || {}
+                _model.filterBy = function (filter) {
+                        filter=filter || {}
                         
-                        return _model.data.filter(function(record) {
-                                options.forEach(function(filter_key, filter_value) {
-                                        if(record[filter_key]!=filter_value) return false;
-                                })
+                        return _model.data.filter(function(record) {     
+                                
+                                for(key in filter) {
+                                        if(record[key]!=filter[key]) return false
+                                }
+                                
                                 return true
+                                
                         })
                         
                 }

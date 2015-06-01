@@ -17,7 +17,14 @@ app.service('Models', function(ParseConnector, $q) {
                         title: {}
                 }
         })
-
+        
+        model.book.update_promise.then(function(){
+                console.log(model.book)
+                console.log(model.book.data)
+                console.log(model.book.filterBy({id:"YUhBT8rBPs"}))
+                
+        })
+/*
         model.chapter = new ParseConnector.Model({
                 table: 'Chapter',
                 parse_update_delay: 0,                
@@ -26,15 +33,12 @@ app.service('Models', function(ParseConnector, $q) {
                 }
         })
 
-        model.book.update_promise.then(function(){
-                console.log(model.book)                
-                
-        })
+        
         
         model.chapter.update_promise.then(function(){
                 console.log(model.chapter)
         })
-        
+  */      
         return model
 
 
