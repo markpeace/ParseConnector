@@ -17,13 +17,13 @@ app.service('ParseConnector', function($q) {
                         return null;
                 }
 
-                Storage.prototype.setObject = function(key, value) {
-                        this.setItem(key, JSON.stringify(value));
-                }
-
-                Storage.prototype.getObject = function(key) {
-                        var value = this.getItem(key);
-                        return value && JSON.parse(value);
+                Object.prototype.forEach = function(function_to_run) {
+                        object=this
+                        for (key in object) {
+                                if(object.hasOwnProperty(key)){
+                                        function_to_run(key, object[key])                                        
+                                }
+                        }
                 }
 
         }();
@@ -54,8 +54,10 @@ app.service('ParseConnector', function($q) {
                         constraints: [],                        // query constraints
                         cache_timeout:  60 * 24,                // how long to wait between recache enquiries    
                         //BUILT-IN VALUES      
-                        recache_query: null                     // model query goes here.
+                        last_retrieved: null                    // timestamp indicating when data was last recached from parse
                 });  
+                options.attributes.id = {}
+                options.attributes.last_retrieved = {}
                 if ( e = options.enforce_requirements({ table: true, attributes: true }) ) { console.log(e + " when initialising model"); return }
 
                 // Basic setup  
@@ -66,32 +68,66 @@ app.service('ParseConnector', function($q) {
 
 
                 _model.recache = function () {
-                        // Create recache query
-                        if (!_model.recache_query) {
-                                _model.recache_query = new Parse.Query(_model.table)
-                                _model.constraints.forEach(function(constraint) {
-                                        _model.recache_query=eval("_model.recache_query" + constraint)   
-                                }) 
-                                _model.recache_query.limit(9999)
+
+                        var retrieve_cached_data = function () {                // retrieves cached data, and checks for an update
+                                _model.data=[]
+
+                                //window.localStorage.removeItem(_model.table)
+
+                                var cached_data = JSON.parse(window.localStorage.getItem(_model.table)) || { last_retrieved: null, data: [] }
+                                cached_data.data.forEach(function(cached_record) {
+                                        _model.new(cached_record)
+                                })
+                                console.info("- Retrieved "+cached_data.data.length+" cached records for "+_model.table)
+                                retrieve_parse_data(cached_data.last_retrieved)
                         }
 
-                        // Clear existing cache
-                        _model.data=[]
-
-                        // Do Recache
-                        _model.recache_query.find().then(function(parse_dataset) {
-                                parse_dataset.forEach(function(parse_record) {
-                                        _model.new(parse_record).fetch()
+                        var retrieve_parse_data = function (last_retrieved) {                 // retrieves parse data since the last update
+                                
+                                last_retrieved = last_retrieved || (new Date("1/1/01")).toISOString()
+                                
+                                var query = new Parse.Query(_model.table);
+                                _model.constraints.forEach(function(constraint) {
+                                        query=eval("query" + constraint)   
+                                })                                
+                                query.greaterThan('updatedAt', last_retrieved)                               
+                                query.limit(9999)                                
+                                query.find().then(function(parse_recordset) {
+                                        
+                                        parse_recordset.forEach(function(parse_record) {
+                                                _model.new(parse_record).fetch();
+                                        })
+                                        
+                                        console.info("- Retrieved "+parse_recordset.length+" Parse records for "+_model.table)
+                                        _model.last_retrieved = (new Date()).toISOString();
+                                        _model.cache();
                                 })
-                                _model.cache()
-                        })
+                                
+                        }
+
+                        retrieve_cached_data();
 
                 }
 
                 _model.cache = function () {
-                        window.localStorage.setObject(_model.table, _model.data)
-                        var a = window.localStorage.getObject(_model.table)
-                        console.log(a)                              
+                        var data_to_cache = []
+                        _model.data.forEach(function(record) {
+                                var record_to_cache = {}
+
+                                _model.attributes.forEach(function(attribute) {
+                                        record_to_cache[attribute] = record[attribute]
+                                })
+
+                                data_to_cache.push(record_to_cache)
+                        })
+
+                        data_to_cache = {
+                                last_retrieved: _model.last_retrieved,
+                                data: data_to_cache
+                        }
+
+                        window.localStorage.setItem(_model.table, JSON.stringify(data_to_cache))
+                        console.info("- Saved to local cache ("+ _model.table +")")
                 }
 
 
@@ -100,9 +136,13 @@ app.service('ParseConnector', function($q) {
                         preset = preset || {}
 
                         var _newRecord = {}
-                       //_newRecord.parent=_model
+                        _newRecord.parent=_model
 
-                        if (preset.cid) {               //A PARSE OBJECT HAS BEEN PASSED
+                        if (preset.last_retrieved) {                    //A CACHED OBJECT HAS BEEN PASSED
+                                _model.attributes.forEach(function (key) {
+                                        _newRecord[key] = preset[key]
+                                })
+                        } else if (preset.cid) {                        //A PARSE OBJECT HAS BEEN PASSED
                                 _newRecord.parseObject = preset
                         }
 
@@ -111,7 +151,9 @@ app.service('ParseConnector', function($q) {
                                         if(_model.attributes.hasOwnProperty(attribute)) {
                                                 _newRecord[attribute] = preset.get(attribute)
                                         }
-                                }                
+                                }
+                                _newRecord.id = preset.id
+                                _newRecord.last_retrieved = new Date().toISOString()
                         }
 
                         _model.data.push(_newRecord)

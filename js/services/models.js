@@ -24,8 +24,8 @@ app.service('Models', function(ParseConnector, $q) {
                 }
         })
 
-        //console.log(model.group)
-        //console.log(model.chapter)
+        console.log(model.group)
+        console.log(model.chapter)
 
         return model
 
