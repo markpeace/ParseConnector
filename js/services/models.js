@@ -10,7 +10,7 @@ app.service('Models', function(ParseConnector, $q) {
 
 
 
-        model.group = new ParseConnector.Model({
+        model.book = new ParseConnector.Model({
                 table: 'Book',
                 parse_update_delay: 0,
                 attributes: {
@@ -26,9 +26,15 @@ app.service('Models', function(ParseConnector, $q) {
                 }
         })
 
-        console.log(model.group)
-        console.log(model.chapter)
-
+        model.book.update_promise.then(function(){
+                console.log(model.book)                
+                
+        })
+        
+        model.chapter.update_promise.then(function(){
+                console.log(model.chapter)
+        })
+        
         return model
 
 

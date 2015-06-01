@@ -55,7 +55,8 @@ app.service('ParseConnector', function($q) {
                         constraints: [],                        // query constraints
                         parse_update_delay: 60,                 // how long to wait between each check for parse updates (mins)   
                         //BUILT-IN VALUES      
-                        last_retrieved: null                    // timestamp indicating when data was last recached from parse
+                        last_retrieved: null,                   // timestamp indicating when data was last recached from parse
+                        update_promise: null                    // this is filled with a promise when updating
                 });
                 options.attributes.id = {}
                 options.attributes.last_retrieved = {}
@@ -67,8 +68,11 @@ app.service('ParseConnector', function($q) {
                 _model.data = new Array();
                 console.info("Created model which wraps table: " + _model.table)
 
-
                 _model.recache = function () {
+                        
+                        var deferred = $q.defer()
+                        
+                        _model.update_promise=deferred.promise
 
                         var retrieve_cached_data = function () {                // retrieves cached data, and checks for an update
                                 _model.data=[]
@@ -94,6 +98,7 @@ app.service('ParseConnector', function($q) {
                                 if(new Date(next_retrieval).getTime() > new Date().getTime()) {
                                         console.log(new Date(next_retrieval).getTime() - new Date().getTime())
                                         console.info("- Parse updated skipped for " + _model.table)
+                                        deferred.resolve();
                                         return;
                                 }
                                 
@@ -112,6 +117,8 @@ app.service('ParseConnector', function($q) {
                                         console.info("- Retrieved "+parse_recordset.length+" Parse records for "+_model.table)
                                         _model.last_retrieved = (new Date()).toISOString();
                                         _model.cache();
+                                        
+                                        deferred.resolve();
                                 })
 
                         }
@@ -141,7 +148,6 @@ app.service('ParseConnector', function($q) {
                         console.info("- Saved to local cache ("+ _model.table +")")
                 }
 
-
                 _model.new = function(preset) {
 
                         preset = preset || {}
@@ -169,6 +175,18 @@ app.service('ParseConnector', function($q) {
 
                         _model.data.push(_newRecord)
                         return _newRecord
+                }
+                
+                _model.filterBy = function (options) {
+                        options=options || {}
+                        
+                        return _model.data.filter(function(record) {
+                                options.forEach(function(filter_key, filter_value) {
+                                        if(record[filter_key]!=filter_value) return false;
+                                })
+                                return true
+                        })
+                        
                 }
 
                 _model.recache();
