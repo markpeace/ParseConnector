@@ -16,10 +16,10 @@ app.service('Models', function(ParseConnector, $q) {
         model.book.update_promise.then(function(){
 
                 console.log(model.book)
-                console.log(model.book.data);                               
+                console.log(model.book.data);  
 
         })
-        
+
         model.chapter = new ParseConnector.Model({
                 table: 'Chapter',
                 parse_update_delay: 0,                
@@ -32,7 +32,7 @@ app.service('Models', function(ParseConnector, $q) {
                 console.log(model.chapter)
                 console.log(model.chapter.data)
         })
-        
+
         return model
 
 

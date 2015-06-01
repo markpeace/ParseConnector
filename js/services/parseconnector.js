@@ -132,11 +132,30 @@ app.service('ParseConnector', function($q) {
 
                                         console.info("- Retrieved "+parse_recordset.length+" Parse records for "+_model.table)
                                         _model.last_retrieved = (new Date()).toISOString();
-                                        _model.cache();
 
-                                        deferred.resolve();
+                                        retrieve_parse_deleted(last_retrieved)
+
                                 })
 
+                        }
+
+                        var retrieve_parse_deleted = function (last_retrieved) {
+
+                                var query = new Parse.Query("pc_system");
+                                query.greaterThan('updatedAt', last_retrieved)                             
+                                query.equalTo('table', _model.table)
+                                query.equalTo('action', 'deleted')
+                                query.limit(9999)                                
+                                query.find().then(function(parse_recordset) {
+                                        parse_recordset.forEach(function (parseRecord) {
+                                                _model.data = _model.data.filter(function(r){
+                                                        return !(r.id==parseRecord.get('target_id'))
+                                                })                                                
+                                        })
+                                        console.log("- Removed " + parse_recordset.length + " records from " +_model.table)
+                                        _model.cache();
+                                        deferred.resolve();
+                                })
                         }
 
                         retrieve_cached_data();
@@ -190,11 +209,7 @@ app.service('ParseConnector', function($q) {
                                                 if(_newRecord.parseObject) {            //and it has a parse record attached
                                                         performSave()
                                                 } else {                                //otherwise fetch the existing one
-                                                        (new Parse.Query(_model.table))
-                                                                .get(_newRecord.id).then(function(parseobject) {                                                                  
-                                                                _newRecord.parseObject=parseobject
-                                                                performSave();
-                                                        })
+                                                        _newRecord.fetch(true).then(performSave)
                                                 }
                                         } else {                                //OTHERWISE CREATE A RECORD
                                                 console.log(_newRecord)
@@ -203,7 +218,7 @@ app.service('ParseConnector', function($q) {
                                         }
                                 }
 
-                                var performSave = function() {                                       
+                                var performSave = function() {    
 
                                         for (key in _model.attributes) {
                                                 if(key!="last_retrieved") {_newRecord.parseObject.set(key, _newRecord[key])}
@@ -224,14 +239,86 @@ app.service('ParseConnector', function($q) {
                                 return deferred.promise
                         }
 
-                        _newRecord.fetch = function() {
-                                for(attribute in _model.attributes) {                                        
-                                        if(_model.attributes.hasOwnProperty(attribute)) {
-                                                _newRecord[attribute] = _newRecord.parseObject.get(attribute)
+                        _newRecord.fetch = function(onlyParseObject) {
+
+                                var deferred = $q.defer();
+
+                                getObject = function() {
+                                        if(!_newRecord.parseObject) {
+
+                                                (new Parse.Query(_model.table))
+                                                        .get(_newRecord.id).then(function(parseobject) {        
+
+                                                        _newRecord.parseObject=parseobject
+                                                        if(!onlyParseObject)  {
+                                                                getValues();
+                                                        } else {
+                                                                deferred.resolve();                                                        
+                                                        }
+
+                                                })
+                                        } else {
+                                                if(!onlyParseObject) { 
+                                                        getValues();
+                                                } else {                                                        
+                                                        deferred.resolve();
+                                                }
                                         }
                                 }
-                                _newRecord.id = _newRecord.parseObject.id
-                                _newRecord.last_retrieved = new Date().toISOString()
+
+                                getValues = function() {
+                                        for(attribute in _model.attributes) {                                        
+                                                if(_model.attributes.hasOwnProperty(attribute)) {
+                                                        _newRecord[attribute] = _newRecord.parseObject.get(attribute)
+                                                }
+                                        }
+                                        _newRecord.id = _newRecord.parseObject.id
+                                        _newRecord.last_retrieved = new Date().toISOString()
+                                        deferred.resolve();                                        
+                                }
+
+                                getObject();
+
+                                return deferred.promise
+
+                        }
+
+                        _newRecord.delete = function () {
+
+                                var deferred = $q.defer();
+
+                                getObject = function () {
+                                        if(!_newRecord.parseObject) {                                                               
+                                                _newRecord.fetch(true).then(function() {
+                                                        console.log("m")
+                                                        doDelete()
+                                                })
+                                        } else {
+                                                doDelete()
+                                        }                                                          
+
+                                }
+
+                                doDelete=function() {
+
+                                        (new (Parse.Object.extend("pc_system"))).save({
+                                                target_id: _newRecord.id,
+                                                table: _model.table,
+                                                action: 'deleted'
+                                        }).then(function() {                                                          
+                                                _newRecord.parseObject.destroy().then(function() { 
+                                                        _model.data = _model.data.filter(function(r) {                                                                
+                                                                return !(r.id==_newRecord.id) 
+                                                        })                      
+                                                        deferred.resolve(); 
+                                                })                                                                                                
+                                        })                                                                                                                   
+                                }
+
+                                getObject();
+
+                                return deferred.promise
+
                         }
 
                         return _newRecord
