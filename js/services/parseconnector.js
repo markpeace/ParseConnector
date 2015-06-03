@@ -216,7 +216,6 @@ app.service('ParseConnector', function($q) {
 
                                                 //VALIDATIONS - UNIQUE FIELD
                                                 if(_model.attributes[attribute].unique) {
-                                                        console.log(attribute)
                                                         var query = new Parse.Query(_model.table)
                                                         query.equalTo(attribute, _newRecord[attribute])
                                                         var unique_promise = $q.defer()

@@ -11,9 +11,26 @@ app.service('Models', function(ParseConnector, $q) {
                         parse_update_delay: 0,
                         attributes: {
                                 title: { required: true, unique: true },
-                                type: {}
+                                author: { link_to: 'Author' },
+                                type: {},
+                                chapters: { link_to: ['Chapter'] }
                         }
 
+                },
+                author: {
+                        table: 'Author',
+                        parse_update_delay: 0,
+                        attributes: {
+                                name: { required: true }
+                        }
+                },
+                chapter: {
+                        table: 'Chapter',
+                        parse_update_delay: 0,
+                        attributes: {
+                                title: { required: true },
+                                book: { link_to: 'Book' }
+                        }
                 },
                 pc_system: {
                         table: 'pc_system'
@@ -340,7 +357,90 @@ app.service('Models', function(ParseConnector, $q) {
 
                                 return  deferred.promise
                         } 
-                },  
+                },
+                { 
+                        title: "###fields with *one-to-one attribute ( link_to: 'table' )* should automatically look up their relationship",
+                        doTest: function() {
+                                var deferred = $q.defer()
+
+                                var target_book = model.book.filterBy({ title: "Book One" })[0]
+                                var target_author
+                                
+                                var prepopulate = function() { 
+
+                                        model.author = new ParseConnector.Model(definitions.author)
+                                        $q.all(model.author.update_promise).then(function() {
+
+                                                target_author = model.author.new({ name: "Joe Bloggs" })
+                                                target_author.save().then(function() {
+                                                        
+                                                        target_book.parseObject.set("Author", target_author.parseObject)
+                                                        target_book.parseObject.save().then(doTest)
+                                                        
+                                                })
+
+                                        })
+
+                                }
+
+                                var doTest = function () {                                        
+                                        
+                                        $q.all([model.author.recache(), model.book.recache()]).then(function() {
+                                                
+                                                var target_book = model.book.filterBy({ title: "Book One" })[0]
+                                                var target_author = model.author.filterBy({ name: "Joe Bloggs" })[0]
+                                                
+                                                console.log(target_book)
+                                                console.log(target_author)
+                                                
+                                                if (target_book.author == target_author) {
+                                                        deferred.resolve()         
+                                                } else {
+                                                        deferred.reject("expected author field to reference Joe Bloggs record, but it didn't")
+                                                        console.log(target_book.author)
+                                                }
+                                                
+                                                                                                
+                                        })                                       
+
+                                }
+
+                                prepopulate()
+
+                                return  deferred.promise
+                        } 
+                },    
+
+                { 
+                        title: "###fields with one-to-one attribute should accept an existing record as a value",
+                        doTest: function() {
+                                var deferred = $q.defer()
+
+                                deferred.resolve()                               
+
+                                return  deferred.promise
+                        } 
+                },    
+                { 
+                        title: "###when a new object is passed to fields with one-to-one attribute it should be created",
+                        doTest: function() {
+                                var deferred = $q.defer()
+
+                                deferred.resolve()                               
+
+                                return  deferred.promise
+                        } 
+                },
+                { 
+                        title: "###when an object associated with a one-to-one attribute is deleted, it should be dynamically removed from that attribute",
+                        doTest: function() {
+                                var deferred = $q.defer()
+
+                                deferred.resolve()                               
+
+                                return  deferred.promise
+                        } 
+                },
                 { 
                         title: "Dummy Test",
                         doTest: function() {
