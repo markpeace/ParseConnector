@@ -62,7 +62,7 @@ app.service('ParseConnector', function($q) {
                         parse_update_delay: 60,                 // how long to wait between each check for parse updates (mins)   
                         //BUILT-IN VALUES      
                         last_retrieved: null,                   // timestamp indicating when data was last recached from parse
-                        update_promise: null                    // this is filled with a promise when updating
+                        update_promise: $q.defer()              // this is filled with a promise when updating
                 });
                 options.attributes.id = {}
                 options.attributes.last_retrieved = {}
@@ -76,14 +76,10 @@ app.service('ParseConnector', function($q) {
 
                 _model.recache = function () {
 
-                        var deferred = $q.defer()
-
-                        _model.update_promise=deferred.promise
+                        if(_model.update_promise.promise.$$state.status!=0) _model.update_promise=$q.defer()
 
                         var retrieve_cached_data = function () {                // retrieves cached data, and checks for an update
                                 _model.data=[]
-
-                                window.localStorage.removeItem(_model.table)
 
                                 var cached_data = JSON.parse(window.localStorage.getItem(_model.table)) || { last_retrieved: null, data: [] }
                                 cached_data.data.forEach(function(cached_record) {
@@ -152,13 +148,15 @@ app.service('ParseConnector', function($q) {
                                                         return !(r.id==parseRecord.get('target_id'))
                                                 })                                                
                                         })
-                                        console.log("- Removed " + parse_recordset.length + " records from " +_model.table)
+                                        console.info("- Removed " + parse_recordset.length + " records from " +_model.table)
                                         _model.cache();
-                                        deferred.resolve();
+                                        _model.update_promise.resolve();
                                 })
                         }
 
                         retrieve_cached_data();
+
+                        return _model.update_promise.promise
 
                 }
 
@@ -204,6 +202,42 @@ app.service('ParseConnector', function($q) {
                         _newRecord.save = function () {
                                 var deferred = $q.defer()
 
+                                var processValidations = function() {
+
+                                        var error_messages = ""
+
+                                        promises =[]
+                                        
+                                        
+                                        for(attribute in _model.attributes) {
+
+                                                //VALDATIONS - REQUIRED FIELD
+                                                if(_model.attributes[attribute].required && !_newRecord[attribute]) error_messages=error_messages+"- a value must be provided for"+attribute;                                                        
+
+                                                //VALIDATIONS - UNIQUE FIELD
+                                                if(_model.attributes[attribute].unique) {
+                                                        console.log(attribute)
+                                                        var query = new Parse.Query(_model.table)
+                                                        query.equalTo(attribute, _newRecord[attribute])
+                                                        var unique_promise = $q.defer()
+                                                        promises.push(unique_promise.promise)
+                                                        query.count().then(function(record_count) {
+                                                                if(record_count>0)  error_messages+="- " + attribute + " must be a unique value";
+                                                                unique_promise.resolve();
+                                                        })
+                                                }                                               
+                                        }
+                                        
+                                        $q.all(promises).then(function() {
+                                                if (error_messages) {
+                                                        
+                                                        _model.data.pop()
+                                                                                                                
+                                                        deferred.reject(error_messages)      
+                                                } else { findParseObject (); }
+                                        })
+                                }
+
                                 var findParseObject = function () {
                                         if(_newRecord.id) {                     //IF IT'S AN EXISTING RECORD     
                                                 if(_newRecord.parseObject) {            //and it has a parse record attached
@@ -223,7 +257,9 @@ app.service('ParseConnector', function($q) {
                                                 if(key!="last_retrieved") {_newRecord.parseObject.set(key, _newRecord[key])}
                                         }
 
-                                        _newRecord.parseObject.save().then(function() {
+                                        _newRecord.parseObject.save().then(function(saved_record) {
+
+                                                _newRecord.id = saved_record.id
 
                                                 _newRecord.last_retrieved=new Date().toISOString()
                                                 _model.cache()
@@ -233,7 +269,7 @@ app.service('ParseConnector', function($q) {
 
                                 }
 
-                                findParseObject()
+                                processValidations()
 
                                 return deferred.promise
                         }
@@ -298,8 +334,6 @@ app.service('ParseConnector', function($q) {
                                 }
 
                                 doDelete=function() {
-                                        
-                                        console.log("M:"+_newRecord.id);
 
                                         (new (Parse.Object.extend("pc_system"))).save({
                                                 target_id: _newRecord.id,
@@ -309,7 +343,10 @@ app.service('ParseConnector', function($q) {
                                                 _newRecord.parseObject.destroy().then(function() { 
                                                         _model.data = _model.data.filter(function(r) {                                                                
                                                                 return !(r.id==_newRecord.id) 
-                                                        })                      
+                                                        })         
+
+                                                        _model.cache();
+
                                                         deferred.resolve(); 
                                                 })                                                                                                
                                         })                                                                                                                   
