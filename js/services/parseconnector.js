@@ -207,8 +207,8 @@ app.service('ParseConnector', function($q) {
                                         var error_messages = ""
 
                                         promises =[]
-                                        
-                                        
+
+
                                         for(attribute in _model.attributes) {
 
                                                 //VALDATIONS - REQUIRED FIELD
@@ -226,12 +226,12 @@ app.service('ParseConnector', function($q) {
                                                         })
                                                 }                                               
                                         }
-                                        
+
                                         $q.all(promises).then(function() {
                                                 if (error_messages) {
-                                                        
+
                                                         _model.data.pop()
-                                                                                                                
+
                                                         deferred.reject(error_messages)      
                                                 } else { findParseObject (); }
                                         })
@@ -303,7 +303,15 @@ app.service('ParseConnector', function($q) {
                                 getValues = function() {
                                         for(attribute in _model.attributes) {                                        
                                                 if(_model.attributes.hasOwnProperty(attribute)) {
-                                                        _newRecord[attribute] = _newRecord.parseObject.get(attribute)
+
+                                                        if(typeof _model.attributes[attribute].link_to=="string") {
+                                                                console.debug("o2o"+attribute)
+                                                        } else if(typeof _model.attributes[attribute].link_to=="object") {
+                                                                console.debug("o2m"+attribute)
+                                                        } else {
+                                                                _newRecord[attribute] = _newRecord.parseObject.get(attribute)                                                                
+                                                        }
+
                                                 }
                                         }
                                         _newRecord.id = _newRecord.parseObject.id
