@@ -32,7 +32,7 @@ app.service('ParseConnector', function($q) {
 
         }
 
-        var Models = {}
+        var __localcopy = {}
 
         var initialise = function(options) {                        //CONNECTS TO PARSE AND RETURNS A SHARED MODEL OBJECT
                 apply_helper_functions(options)
@@ -42,7 +42,7 @@ app.service('ParseConnector', function($q) {
 
                 Parse.initialize(options.app_id, options.javascript_key);    
 
-                return Models;
+                return __localcopy;
         }
 
 
@@ -53,30 +53,53 @@ app.service('ParseConnector', function($q) {
                 // Set up options and enforce any enforced parameters
                 apply_helper_functions(options)
 
+                //var __update_deferred = $q.defer()
+                //var __relationship
+
                 options.apply_defaults({
                         //REQUIRED VALUES                
                         table: null,                            // parse table to draw data from
                         attributes: {},                         // definition of fields within the table
                         //OPTIONAL VALUES
                         constraints: [],                        // query constraints
-                        parse_update_delay: 60,                 // how long to wait between each check for parse updates (mins)   
+                        parse_update_delay: 60,                 // how long to wait between each check for parse updates (mins) 
+                        time_offset: 30,                        // used to accomodate time differences between local and parse (mainly just for unit testing)
                         //BUILT-IN VALUES      
-                        last_retrieved: null,                   // timestamp indicating when data was last recached from parse
-                        update_promise: $q.defer()              // this is filled with a promise when updating
+                        parent: __localcopy,
+                        last_retrieved: null,                   // timestamp indicating when data was last recached from parse     
+                        update_deferral: null,
+                        update_promise: null,                   // this is filled with a promise when updating
+                        relationship_update_deferral: null,
+                        relationship_update_promise: null,     //
+                        relationship_promises: []               //
                 });
                 options.attributes.id = {}
                 options.attributes.last_retrieved = {}
                 if ( e = options.enforce_requirements({ table: true, attributes: true }) ) { console.log(e + " when initialising model"); return }
 
                 // Basic setup  
-                var _model = this        
+                var _model = this
+                __localcopy[options.table]=this
+
+
                 for (key in options) { _model[key] = options[key] }
                 _model.data = new Array();
                 console.info("Created model which wraps table: " + _model.table)
 
                 _model.recache = function () {
 
-                        if(_model.update_promise.promise.$$state.status!=0) _model.update_promise=$q.defer()
+                        _model.update_deferral = $q.defer()
+                        _model.update_promise = _model.update_deferral.promise
+
+                        _model.relationship_update_deferral = $q.defer()
+                        _model.relationship_update_promise = _model.relationship_update_deferral.promise
+
+                        
+                        $q.when(_model.update_promise).then(function() {
+                                $q.all(_model.relationship_promises).then(function() {
+                                        _model.relationship_update_deferral.resolve();
+                                })
+                        })
 
                         var retrieve_cached_data = function () {                // retrieves cached data, and checks for an update
                                 _model.data=[]
@@ -89,7 +112,9 @@ app.service('ParseConnector', function($q) {
                                 _model.last_retrieved = cached_data.last_retrieved
 
                                 console.info("- Retrieved "+cached_data.data.length+" cached records for "+_model.table)
-                                retrieve_parse_data(cached_data.last_retrieved)
+
+                                retrieve_parse_data(cached_data.last_retrieved) 
+
                         }
 
                         var retrieve_parse_data = function (last_retrieved) {                 // retrieves parse data since the last update
@@ -98,8 +123,8 @@ app.service('ParseConnector', function($q) {
                                 var next_retrieval = (new Date(last_retrieved)).getTime() + (_model.parse_update_delay * 60 * 1000)
 
                                 if(new Date(next_retrieval).getTime() > new Date().getTime()) {
-                                        console.log(new Date(next_retrieval).getTime() - new Date().getTime())
                                         console.info("- Parse updated skipped for " + _model.table)
+                                        _model.update_deferral.resolve();
                                         deferred.resolve();
                                         return;
                                 }
@@ -107,10 +132,18 @@ app.service('ParseConnector', function($q) {
                                 var query = new Parse.Query(_model.table);
                                 _model.constraints.forEach(function(constraint) {
                                         query=eval("query" + constraint)   
-                                })                                
+                                })                             
+
+                                //APPLY TIME OFFSET
+                                last_retrieved = new Date(last_retrieved)
+                                last_retrieved=new Date(last_retrieved.setTime(last_retrieved.getTime()+(1000 * _model.time_offset)))
+                                last_retrieved = last_retrieved.toISOString()
+
                                 query.greaterThan('updatedAt', last_retrieved)                               
-                                query.limit(9999)                                
+                                query.limit(9999)        
                                 query.find().then(function(parse_recordset) {
+
+                                        var fetch_promises=[]
 
                                         parse_recordset.forEach(function(parse_record) {
 
@@ -119,17 +152,18 @@ app.service('ParseConnector', function($q) {
                                                 if(existing_record.length>0) {
                                                         existing_record=existing_record[0]
                                                         existing_record.parseObject=parse_record
-                                                        existing_record.fetch()
+                                                        fetch_promises.push(existing_record.fetch())
                                                 } else {
-                                                        _model.new(parse_record).fetch();                                                        
+                                                        fetch_promises.push(_model.new(parse_record).fetch());                                                        
                                                 }
 
                                         })
 
-                                        console.info("- Retrieved "+parse_recordset.length+" Parse records for "+_model.table)
-                                        _model.last_retrieved = (new Date()).toISOString();
-
-                                        retrieve_parse_deleted(last_retrieved)
+                                        $q.all(fetch_promises).then(function () {
+                                                console.info("- Retrieved "+parse_recordset.length+" Parse records for "+_model.table)
+                                                _model.last_retrieved = new Date().toISOString();                                                
+                                                retrieve_parse_deleted(last_retrieved)
+                                        })
 
                                 })
 
@@ -141,22 +175,26 @@ app.service('ParseConnector', function($q) {
                                 query.greaterThan('updatedAt', last_retrieved)                             
                                 query.equalTo('table', _model.table)
                                 query.equalTo('action', 'deleted')
-                                query.limit(9999)                                
+                                query.limit(9999)               
                                 query.find().then(function(parse_recordset) {
                                         parse_recordset.forEach(function (parseRecord) {
                                                 _model.data = _model.data.filter(function(r){
                                                         return !(r.id==parseRecord.get('target_id'))
                                                 })                                                
                                         })
-                                        console.info("- Removed " + parse_recordset.length + " records from " +_model.table)
-                                        _model.cache();
-                                        _model.update_promise.resolve();
+                                        console.info("- Removed " + parse_recordset.length + " records from " +_model.table)      
+                                        do_final_bits();
                                 })
+                        }
+
+                        var do_final_bits = function() {
+                                _model.cache();
+                                _model.update_deferral.resolve();
                         }
 
                         retrieve_cached_data();
 
-                        return _model.update_promise.promise
+                        return _model.update_promise
 
                 }
 
@@ -166,7 +204,13 @@ app.service('ParseConnector', function($q) {
                                 var record_to_cache = {}
 
                                 for(attribute in _model.attributes) {
-                                        record_to_cache[attribute] = record[attribute]
+
+                                        if(typeof record[attribute]==="object") {
+                                                record_to_cache[attribute] = record[attribute].id
+                                        } else {
+                                                record_to_cache[attribute] = record[attribute]
+                                        }
+
                                 }                                
 
                                 data_to_cache.push(record_to_cache)
@@ -176,6 +220,7 @@ app.service('ParseConnector', function($q) {
                                 last_retrieved: _model.last_retrieved,
                                 data: data_to_cache
                         }
+
 
                         window.localStorage.setItem(_model.table, JSON.stringify(data_to_cache))
                         console.info("- Saved to local cache ("+ _model.table +")")
@@ -189,12 +234,70 @@ app.service('ParseConnector', function($q) {
                         _newRecord.parent=_model
                         _model.data.push(_newRecord)
 
-                        if (preset.cid) {                               //A PARSE OBJECT HAS BEEN PASSED
-                                _newRecord.parseObject = preset
-                        } else {                                        //A BRAND NEW OR CACHED OBJECT HAS BEEN PASSED 
+                        _newRecord.construct = function() {
+                                if (preset.cid) {                               //A PARSE OBJECT HAS BEEN PASSED
+                                        _newRecord.parseObject = preset
+                                } else {                                        //A BRAND NEW OR CACHED OBJECT HAS BEEN PASSED 
 
-                                for(key in _model.attributes) {
-                                        _newRecord[key]=preset[key]
+                                        for(attribute in _model.attributes) {
+
+                                                _newRecord[attribute]=preset[attribute]
+
+                                                if(_model.attributes[attribute].link_to && _newRecord[attribute]) _newRecord.populateAttribute(attribute);
+
+                                        }
+
+                                }
+
+                        }
+
+                        _newRecord.populateAttribute = function(attribute) {            //FUNCTION WHICH PULLS IN RELATIONSHIP DATA
+
+                                var get_target_record = function() {
+
+                                        if(typeof _model.attributes[attribute].link_to=="string") {
+
+                                                _newRecord[attribute] = _newRecord[attribute].id || _newRecord[attribute]
+
+                                                _newRecord[attribute] = _model.parent[foreign_table].filterBy({id:_newRecord[attribute]})[0] || _newRecord[attribute]
+
+                                                field_specific_promise.resolve()                                        
+
+                                        } else if(typeof _model.attributes[attribute].link_to=="object") {        
+
+                                                if(_newRecord[attribute].length) {
+                                                        _newRecord[attribute].forEach(function(id) {
+                                                                id=_model.parent[foreign_table].filterBy({id:id})[0] || _newRecord[attribute]
+                                                        })
+                                                        
+                                                        field_specific_promise.resolve()                                        
+
+                                                        
+                                                } else {
+                                                        _newRecord.parseObject.relation(attribute).query().find().then(function(results){
+                                                                _newRecord[attribute] = []
+                                                                results.forEach(function(result) {                                                                        
+                                                                        _newRecord[attribute].push(
+                                                                                _model.parent[foreign_table].filterBy({id:result.id})[0] || results.id
+                                                                        )
+                                                                })
+                                                                field_specific_promise.resolve()                                                                                                        
+                                                        })
+                                                }
+
+                                        }
+
+                                }
+
+                                var field_specific_promise = $q.defer()
+                                _model.relationship_promises.push(field_specific_promise.promise)
+
+                                var foreign_table = typeof _model.attributes[attribute].link_to == "object" ? _model.attributes[attribute].link_to[0] :  _model.attributes[attribute].link_to                                
+                                if(_model.parent[foreign_table]) {
+                                        $q.all([_model.parent[foreign_table].update_promise]).then(get_target_record)                                           
+                                } else {
+                                        console.warn("- "+_model.table+".attribute has a relationship with "+foreign_table+", but this model didn't exist")
+                                        field_specific_promise.resolve()                                        
                                 }
 
                         }
@@ -301,21 +404,24 @@ app.service('ParseConnector', function($q) {
                                 }
 
                                 getValues = function() {
-                                        for(attribute in _model.attributes) {                                        
+
+                                        for(attribute in _model.attributes) {   
+
                                                 if(_model.attributes.hasOwnProperty(attribute)) {
 
-                                                        if(typeof _model.attributes[attribute].link_to=="string") {
-                                                                console.debug("o2o"+attribute)
-                                                        } else if(typeof _model.attributes[attribute].link_to=="object") {
-                                                                console.debug("o2m"+attribute)
+                                                        if(_model.attributes[attribute].link_to && _newRecord.parseObject.get(attribute) ) {
+                                                                _newRecord[attribute] = _newRecord.parseObject.get(attribute) 
+                                                                _newRecord.populateAttribute(attribute);                                                                
                                                         } else {
                                                                 _newRecord[attribute] = _newRecord.parseObject.get(attribute)                                                                
                                                         }
 
                                                 }
                                         }
+
                                         _newRecord.id = _newRecord.parseObject.id
                                         _newRecord.last_retrieved = new Date().toISOString()
+
                                         deferred.resolve();                                        
                                 }
 
@@ -365,6 +471,8 @@ app.service('ParseConnector', function($q) {
 
                         }
 
+
+                        _newRecord.construct();
                         return _newRecord
                 }
 
