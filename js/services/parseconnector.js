@@ -94,6 +94,9 @@ app.service('ParseConnector', function($q) {
                         _model.relationship_update_deferral = $q.defer()
                         _model.relationship_update_promise = _model.relationship_update_deferral.promise
 
+                        _model.cache_deferral = $q.defer()
+                        _model.cache_promise=_model.cache_deferral.promise
+
                         var retrieve_cached_data = function () {                // retrieves cached data, and checks for an update
                                 _model.data=[]
 
@@ -182,7 +185,6 @@ app.service('ParseConnector', function($q) {
 
                         var do_final_bits = function() {
                                 _model.cache();
-                                //_model.update_deferral.resolve();
                         }
 
                         retrieve_cached_data();
@@ -193,38 +195,49 @@ app.service('ParseConnector', function($q) {
 
                 _model.cache = function () {
 
-                                $q.all(_model.relationship_promises).then(function() {
-                                        
+                        if(_model.cache_promise.$$state.status==1) {
+                                _model.cache_deferral = $q.defer()
+                                _model.cache_promise=_model.cache_deferral.promise
+                        }
 
-                                        var data_to_cache = []
-                                        _model.data.forEach(function(record) {
-                                                var record_to_cache = {}
+                        _model.update_deferral.resolve()                                               
 
-                                                for(attribute in _model.attributes) {
+                        $q.all(_model.relationship_promises).then(function() {
 
-                                                        if(typeof record[attribute]==="object") {
-                                                                record_to_cache[attribute] = record[attribute].id
-                                                        } else {
-                                                                record_to_cache[attribute] = record[attribute]
+                                var data_to_cache = []
+                                _model.data.forEach(function(record) {
+                                        var record_to_cache = {}
+
+                                        for(attribute in _model.attributes) {
+
+                                                if(typeof record[attribute]==="object" ) {
+                                                        if(!(record_to_cache[attribute] = record[attribute].id) ) {
+                                                                if(record[attribute].length>0) {
+                                                                        record_to_cache[attribute]=record[attribute].map(function(r) { return r.id })
+                                                                }
                                                         }
+                                                } else {
+                                                        record_to_cache[attribute] = record[attribute]
+                                                }
 
-                                                }                                
+                                        }                                
 
-                                                data_to_cache.push(record_to_cache)
-                                        })
+                                        data_to_cache.push(record_to_cache)
+                                })
 
-                                        data_to_cache = {
-                                                last_retrieved: _model.last_retrieved,
-                                                data: data_to_cache
-                                        }
+                                data_to_cache = {
+                                        last_retrieved: _model.last_retrieved,
+                                        data: data_to_cache
+                                }
 
 
-                                        window.localStorage.setItem(_model.table, JSON.stringify(data_to_cache))
-                                        console.info("- Saved to local cache ("+ _model.table +")")
-                                        _model.relationship_update_deferral.resolve();
-                                        _model.update_deferral.resolve()
-                                        
-                                })                      
+                                window.localStorage.setItem(_model.table, JSON.stringify(data_to_cache))
+                                console.info("- Saved to local cache ("+ _model.table +")")
+                                _model.relationship_update_deferral.resolve();             
+                                _model.cache_deferral.resolve()
+                        })                      
+
+                        return _model.cache_promise
 
                 }
 
@@ -268,8 +281,8 @@ app.service('ParseConnector', function($q) {
                                         } else if(typeof _model.attributes[attribute].link_to=="object") {        
 
                                                 if(_newRecord[attribute].length) {
-                                                        _newRecord[attribute].forEach(function(id) {
-                                                                id=_model.parent[foreign_table].filterBy({id:id})[0] || _newRecord[attribute]
+                                                        _newRecord[attribute].forEach(function(id,index) {
+                                                                _newRecord[attribute][index]=_model.parent[foreign_table].filterBy({id:id})[0] || _newRecord[attribute]
                                                         })
 
                                                         field_specific_promise.resolve()                                        
