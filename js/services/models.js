@@ -419,6 +419,17 @@ app.service('Models', function(ParseConnector, $q) {
                                                 assert(target_book.author).should.equal(target_author)
                                                         .then().process_promise(deferred, false, "target author wasn't woven into the target book when pulled from parse")
 
+                                                target_book = JSON.parse(window.localStorage.getItem(model.book.table)).data.filter(function(book) {
+                                                        if(book.id==target_book.id) return true;
+                                                        return false
+                                                })
+                                                target_book=target_book[0]
+                                                                                               
+                                                assert(typeof target_book.author)
+                                                        .should_not.equal("undefined").then().process_promise(deferred, false, "the relationship wasn't saved in the localcache")
+
+                                                assert(target_book.author)
+                                                       .should.equal(target_author.id).then().process_promise(deferred, false, "the relationship wasn't saved as an ID in the localcache")
 
                                                 console.clear_history()
 
@@ -530,17 +541,26 @@ app.service('Models', function(ParseConnector, $q) {
                                                 assert(target_book.chapters.length).should.equal(3)
                                                         .then().process_promise(deferred, false, "expected !expected! chapters from Parse, but found !actual!")
 
-                                                assert(target_book.chapters[2].title).should.equal("Chapter One")
-                                                        .then().process_promise(deferred,true,"expected first chapter to be called !expected!, but it was !actual! when pulled from parse")
+                                                assert(target_book.chapters.map(function(chapter) { return chapter.title })).should.contain("Chapter One")
+                                                        .then().process_promise(deferred,true,"expected chapters array to include !expected! when pulled from parse, but it didn't")
 
+                                                target_book = JSON.parse(window.localStorage.getItem(model.book.table)).data.filter(function(book) {
+                                                        if(book.id==target_book.id) return true;
+                                                        return false
+                                                })
+
+                                                assert(1).should.equal(2).then().process_promise(deferred, false, "MARK")
+
+                                                assert(typeof target_book.chapters)
+                                                        .should.equal("undefined").then().process_promise(deferred, false, "the relationship wasn't saved in the localcache")
 
                                                 model.book=new ParseConnector.Model(definitions.book)
                                                 model.chapter=new ParseConnector.Model(definitions.chapter)
 
                                                 $q.when(model.book.relationship_update_promise).then(function() {
 
-                                                        var target_book = model.book.filterBy({ title: "Book One" })[0]x`x`
-                                                        
+                                                        var target_book = model.book.filterBy({ title: "Book One" })[0]
+
                                                         assert(target_book.chapters.length).should.equal(3)
                                                                 .then().process_promise(deferred, false, "expected !expected! chapters from localStorage, but found !actual!")
 

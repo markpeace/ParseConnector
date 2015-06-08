@@ -94,13 +94,6 @@ app.service('ParseConnector', function($q) {
                         _model.relationship_update_deferral = $q.defer()
                         _model.relationship_update_promise = _model.relationship_update_deferral.promise
 
-                        
-                        $q.when(_model.update_promise).then(function() {
-                                $q.all(_model.relationship_promises).then(function() {
-                                        _model.relationship_update_deferral.resolve();
-                                })
-                        })
-
                         var retrieve_cached_data = function () {                // retrieves cached data, and checks for an update
                                 _model.data=[]
 
@@ -124,7 +117,7 @@ app.service('ParseConnector', function($q) {
 
                                 if(new Date(next_retrieval).getTime() > new Date().getTime()) {
                                         console.info("- Parse updated skipped for " + _model.table)
-                                        _model.update_deferral.resolve();
+                                        //_model.update_deferral.resolve();
                                         deferred.resolve();
                                         return;
                                 }
@@ -189,7 +182,7 @@ app.service('ParseConnector', function($q) {
 
                         var do_final_bits = function() {
                                 _model.cache();
-                                _model.update_deferral.resolve();
+                                //_model.update_deferral.resolve();
                         }
 
                         retrieve_cached_data();
@@ -199,31 +192,40 @@ app.service('ParseConnector', function($q) {
                 }
 
                 _model.cache = function () {
-                        var data_to_cache = []
-                        _model.data.forEach(function(record) {
-                                var record_to_cache = {}
 
-                                for(attribute in _model.attributes) {
+                                $q.all(_model.relationship_promises).then(function() {
+                                        
 
-                                        if(typeof record[attribute]==="object") {
-                                                record_to_cache[attribute] = record[attribute].id
-                                        } else {
-                                                record_to_cache[attribute] = record[attribute]
+                                        var data_to_cache = []
+                                        _model.data.forEach(function(record) {
+                                                var record_to_cache = {}
+
+                                                for(attribute in _model.attributes) {
+
+                                                        if(typeof record[attribute]==="object") {
+                                                                record_to_cache[attribute] = record[attribute].id
+                                                        } else {
+                                                                record_to_cache[attribute] = record[attribute]
+                                                        }
+
+                                                }                                
+
+                                                data_to_cache.push(record_to_cache)
+                                        })
+
+                                        data_to_cache = {
+                                                last_retrieved: _model.last_retrieved,
+                                                data: data_to_cache
                                         }
 
-                                }                                
 
-                                data_to_cache.push(record_to_cache)
-                        })
+                                        window.localStorage.setItem(_model.table, JSON.stringify(data_to_cache))
+                                        console.info("- Saved to local cache ("+ _model.table +")")
+                                        _model.relationship_update_deferral.resolve();
+                                        _model.update_deferral.resolve()
+                                        
+                                })                      
 
-                        data_to_cache = {
-                                last_retrieved: _model.last_retrieved,
-                                data: data_to_cache
-                        }
-
-
-                        window.localStorage.setItem(_model.table, JSON.stringify(data_to_cache))
-                        console.info("- Saved to local cache ("+ _model.table +")")
                 }
 
                 _model.new = function(preset) {
@@ -269,10 +271,10 @@ app.service('ParseConnector', function($q) {
                                                         _newRecord[attribute].forEach(function(id) {
                                                                 id=_model.parent[foreign_table].filterBy({id:id})[0] || _newRecord[attribute]
                                                         })
-                                                        
+
                                                         field_specific_promise.resolve()                                        
 
-                                                        
+
                                                 } else {
                                                         _newRecord.parseObject.relation(attribute).query().find().then(function(results){
                                                                 _newRecord[attribute] = []
@@ -459,8 +461,7 @@ app.service('ParseConnector', function($q) {
                                                         })         
 
                                                         _model.cache();
-
-                                                        deferred.resolve(); 
+                                                        $q.when(_model.update_promise).then(deferred.resolve)
                                                 })                                                                                                
                                         })                                                                                                                   
                                 }
