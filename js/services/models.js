@@ -149,7 +149,7 @@ app.service('Models', function(ParseConnector, $q) {
 
                                                 assert(model.book.data.length)
                                                         .should.equal(2)
-                                                        .then().process_promise(deferred,false, "was expecting to find !expected! books before the test, but found !actual!")
+                                                        .then().process_promise(deferred,true, "was expecting to find !expected! books before the test, but found !actual!")
 
                                                 assert(console.history)
                                                         .should.contain("Book.attribute has a relationship with Chapter, but this model didn't exist")
@@ -196,8 +196,10 @@ app.service('Models', function(ParseConnector, $q) {
 
                                 model.book.new().save().then(function() {
                                         deferred.reject("should have rejected a record without a title, but it was saved")        
-                                }, function() {
-                                        deferred.resolve() 
+                                }, function(e) {
+                                        assert(e).should.contain("title")                                       
+                                                .then().process_promise(deferred,true,"the error message should reference !expected!, but it read '!actual!'")
+
                                 })
 
                                 return  deferred.promise
@@ -209,9 +211,11 @@ app.service('Models', function(ParseConnector, $q) {
                                 var deferred = $q.defer()
 
                                 model.book.new({title:"Book One"}).save().then(function() {
-                                        deferred.reject("should have rejected a record with a duplicated title, but it was saved")        
-                                }, function() {
-                                        deferred.resolve() 
+                                        deferred.reject("should have rejected a record with a duplicated title, but it was saved")                                         
+                                }, function(e) {
+                                        assert(e).should.contain("title")
+                                                .then().process_promise(deferred,true,"the error message should reference !expected!, but it read '!actual!'")
+
                                 })
 
                                 return  deferred.promise
@@ -255,23 +259,60 @@ app.service('Models', function(ParseConnector, $q) {
                         doTest: function() {
                                 var deferred = $q.defer()
 
-                                updateRecord = model.book.filterBy({title: "Book Six"})[0]
+                                prepopulate=function() {
 
-                                assert(updateRecord.title).should.equal("Book Six")
-                                        .then().process_promise(deferred, false, "expected existing title to be !expected!, but it was !actual!")
+                                        model.book = new ParseConnector.Model(definitions.book)
 
-                                updateRecord.title="xxx"
-                                updateRecord.save().then(function() {
+                                        $q.when(model.book.update_promise).then(function () {
 
-                                        (new Parse.Query(model.book.table))
-                                                .get(updateRecord.id).then(function(record) {
+                                                updateRecord = model.book.filterBy({title: "Book Six"})[0]
+                                                assert(updateRecord.title).should.equal("Book Six")
+                                                        .then().process_promise(deferred, false, "expected existing title to be !expected!, but it was !actual!")
+                                                ensure_that_parse_updates()
 
-                                                assert(record.get("title")).should.equal(updateRecord.title)
-                                                        .then().process_promise(deferred, true, "expected title of parse record to be '!expected!', but it was '!actual!'")                                                
+                                        })
+                                }
 
-                                        } ) 
+                                ensure_that_parse_updates = function () {
+                                        updateRecord.title="xxx"
+                                        updateRecord.save().then(function() {
 
-                                })
+                                                (new Parse.Query(model.book.table))
+                                                        .get(updateRecord.id).then(function(record) {
+
+                                                        assert(record.get("title")).should.equal(updateRecord.title)
+                                                                .then().process_promise(deferred, false, "expected title of parse record to be '!expected!', but it was '!actual!'")                                                
+
+                                                        ensure_that_localStorage_updates()                                                        
+                                                }) 
+
+                                        })
+                                }
+
+                                ensure_that_localStorage_updates = function () {
+                                        assert(JSON.stringify(window.localStorage.getItem(model.book.table))).should.contain("xxx")
+                                                .then().process_promise(deferred,false,"expected localstorage to include xxx, but it didn't")
+                                        ensure_that_saves_update_when_purely_cached()
+
+                                }
+
+                                ensure_that_saves_update_when_purely_cached = function () {
+                                        updateRecord = model.book.filterBy({title: "xxx"})[0]
+
+                                        updateRecord.save().then(function() {
+
+                                                assert(model.book.data.length).should.equal(6)
+                                                        .then().process_promise(deferred, true, "expected to find !expected! records after update but found !actual!")
+
+                                        }, function(e) {
+                                                console.log("M"+e)
+                                                deferred.reject("when there is no parse object, the system is trying to create a new object rather than update one")
+                                        })
+
+                                }
+
+
+                                prepopulate()
 
                                 return  deferred.promise
                         } 
@@ -424,12 +465,12 @@ app.service('Models', function(ParseConnector, $q) {
                                                         return false
                                                 })
                                                 target_book=target_book[0]
-                                                                                               
+
                                                 assert(typeof target_book.author)
                                                         .should_not.equal("undefined").then().process_promise(deferred, false, "the relationship wasn't saved in the localcache")
 
                                                 assert(target_book.author)
-                                                       .should.equal(target_author.id).then().process_promise(deferred, false, "the relationship wasn't saved as an ID in the localcache")
+                                                        .should.equal(target_author.id).then().process_promise(deferred, false, "the relationship wasn't saved as an ID in the localcache")
 
                                                 console.clear_history()
 
@@ -470,7 +511,65 @@ app.service('Models', function(ParseConnector, $q) {
                         doTest: function() {
                                 var deferred = $q.defer()
 
-                                deferred.resolve()                               
+                                var target_book = model.book.filterBy({ title: "Book Two" })[0]
+
+
+                                var prepopulate = function () {
+                                        var new_author=model.author.new({name: "Peter Smith"})     
+
+                                        new_author.save().then(function() {
+
+                                                target_book.author=new_author 
+                                                target_book.save().then(test_local_data,function(e) { deferred.reject(e) })
+
+                                        })        
+                                }
+
+                                var test_local_data = function () {
+
+                                        target_book = model.book.filterBy({ title: "Book Two" })[0]
+
+                                        assert(target_book.author.name).should.equal("Peter Smith")
+                                                .then().process_promise(deferred, false, "expected author to be !expected!, but it was !actual!")
+
+                                        test_parse()
+
+                                }                                
+
+                                var test_parse = function () {
+
+                                        target_book = model.book.filterBy({ title: "Book Two" })[0]
+
+                                        var query = new Parse.Query(model.book.table)
+                                        query.include("author").get(target_book.id).then(function(record) {
+
+                                                assert(record.get("author").get("name")).should.equal("Peter Smith")
+                                                        .then().process_promise(deferred,false, "expected book two in parse to have an author named !expected!, but it was !actual!")
+
+                                                var query = new Parse.Query(model.author.table)
+                                                query.count().then(function(c) {
+                                                        assert(c).should.equal(2)
+                                                                .then().process_promise(deferred,false, "expected there to be !expected! authors, but there were !actual!")
+                                                        test_localstorage()
+                                                })
+
+
+                                        })                                                              
+
+
+
+                                }
+
+                                var test_localstorage = function () {
+
+                                        target_author=model.author.filterBy({name:"Peter Smith"})[0]   
+                                        assert(window.localStorage.getItem(model.book.table)).should.contain([target_author.id])
+                                                .then().process_promise(deferred,true,"expected the localStorage for bookto contain author_id !expected!, but it didn't")
+                                       
+                                }
+
+
+                                prepopulate()                            
 
                                 return  deferred.promise
                         } 
@@ -496,7 +595,7 @@ app.service('Models', function(ParseConnector, $q) {
                         } 
                 },
                 { 
-                        title: "###fields with a *one-to-many attribute ( link_to:['table'] ), should automatically populate",
+                        title: "fields with a *one-to-many attribute ( link_to:['table'] ), should automatically populate",
                         doTest: function() {
                                 var deferred = $q.defer()
 
@@ -505,7 +604,7 @@ app.service('Models', function(ParseConnector, $q) {
                                 var new_chapters = ["Chapter One", "Chapter Two", "Chapter Three"]
 
                                 var prepopulate = function() { 
-                                        
+
                                         model.chapter = new ParseConnector.Model(definitions.chapter)
                                         $q.all([model.chapter.update_promise, target_book.fetch()]).then(function() {
 
@@ -538,10 +637,10 @@ app.service('Models', function(ParseConnector, $q) {
 
                                                 var target_book = model.book.filterBy({ title: "Book One" })[0]
 
-                                                assert(target_book.chapters.length).should.equal(3)
+                                                assert(target_book.chapters.data.length).should.equal(3)
                                                         .then().process_promise(deferred, false, "expected !expected! chapters from Parse, but found !actual!")
 
-                                                assert(target_book.chapters.map(function(chapter) { return chapter.title })).should.contain("Chapter One")
+                                                assert(target_book.chapters.data.map(function(chapter) { return chapter.title })).should.contain("Chapter One")
                                                         .then().process_promise(deferred,false,"expected chapters array to include !expected! when pulled from parse, but it didn't")
 
                                                 target_book = JSON.parse(window.localStorage.getItem(model.book.table)).data.filter(function(book) {
@@ -549,25 +648,26 @@ app.service('Models', function(ParseConnector, $q) {
                                                         return false
                                                 })[0]
                                                 
+
                                                 assert(typeof target_book.chapters)
                                                         .should_not.equal("undefined").then().process_promise(deferred, false, "the relationship wasn't saved in the localcache")
-                                                
+
                                                 assert(target_book.chapters.toString())
                                                         .should.contain(model.chapter.data[0].id).then().process_promise(deferred, false, "the relationship wasn't saved as an ID in the localcache")
-                                                
-                                                
-                                                
+
+
                                                 model.book=new ParseConnector.Model(definitions.book)
                                                 model.chapter=new ParseConnector.Model(definitions.chapter)
 
                                                 $q.when(model.book.cache_promise).then(function() {
+
                                                         
                                                         var target_book = model.book.filterBy({ title: "Book One" })[0]
-
-                                                        assert(target_book.chapters.length).should.equal(3)
+                                                        
+                                                        assert(target_book.chapters.data.length).should.equal(3)
                                                                 .then().process_promise(deferred, false, "expected !expected! chapters from localStorage, but found !actual!")
 
-                                                        assert(target_book.chapters.map(function(c) { return c.title } )).should.contain("Chapter One")
+                                                        assert(target_book.chapters.data.map(function(c) { return c.title } )).should.contain("Chapter One")
                                                                 .then().process_promise(deferred,true,"expected related object to contain !expected! when pulled from localStorage")
 
                                                 })
@@ -586,7 +686,43 @@ app.service('Models', function(ParseConnector, $q) {
                         doTest: function() {
                                 var deferred = $q.defer()
 
-                                deferred.resolve()                               
+                                var target_book = model.book.filterBy({ title: "Book One" })[0]
+                                
+                                var prepopulate = function () {
+                                        
+                                        assert(target_book.title).should.equal("Book One").then().process_promise(deferred, false, "couldn't find target book")
+                                        
+                                        new_chapter = model.chapter.new({ title: "Chapter Four" })
+                                        new_chapter.save().then(function() {
+                                                
+                                                console.log("done")
+                                                
+                                                target_book.chapter.add(new_chapter)
+                                                target_book.save().then(test_data)
+                                                
+                                        }, function(e) {
+                                                console.log(e)
+                                        })
+                                                                               
+                                }
+                                
+                                var test_data = function () {
+                                        assert(target_book.chapter.data.length).should.equal(4)
+                                                .then().process_promise(deferred,false,"expected target book to have !expected! chapters, but it had !actual!")
+                                        assert(target_book.chapter.data[3].title).should.equal("Chapter Four")
+                                        .then().process_promise(deferred, false, "expected the final chapter of target book to be !expected!, but it was !actual!")
+                                        test_localstorage();
+                                }
+                                
+                                var test_localstorage = function () {
+                                        
+                                }
+                                
+                                var test_parse = function () {
+                                        
+                                }
+                                
+                                prepopulate();
 
                                 return  deferred.promise
                         } 
@@ -611,6 +747,16 @@ app.service('Models', function(ParseConnector, $q) {
                                 return  deferred.promise
                         } 
                 }, 
+                { 
+                        title: "###mutually referenced records should work fine",
+                        doTest: function() {
+                                var deferred = $q.defer()
+
+                                deferred.resolve()                               
+
+                                return  deferred.promise
+                        } 
+                },  
                 { 
                         title: "Dummy Test",
                         doTest: function() {
@@ -729,7 +875,7 @@ app.service('Models', function(ParseConnector, $q) {
                                 if (test.resolutions._resolution=="") { test.resolutions._resolution=true; }
 
                                 return test.resolutions                               
-                        }  
+                        } 
                 }
 
 

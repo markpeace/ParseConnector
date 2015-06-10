@@ -212,8 +212,8 @@ app.service('ParseConnector', function($q) {
 
                                                 if(typeof record[attribute]==="object" ) {
                                                         if(!(record_to_cache[attribute] = record[attribute].id) ) {
-                                                                if(record[attribute].length>0) {
-                                                                        record_to_cache[attribute]=record[attribute].map(function(r) { return r.id })
+                                                                if(record[attribute].data) {
+                                                                        record_to_cache[attribute]=record[attribute].data.map(function(r) { return r.id })
                                                                 }
                                                         }
                                                 } else {
@@ -259,7 +259,6 @@ app.service('ParseConnector', function($q) {
                                                 _newRecord[attribute]=preset[attribute]
 
                                                 if(_model.attributes[attribute].link_to && _newRecord[attribute]) _newRecord.populateAttribute(attribute);
-
                                         }
 
                                 }
@@ -267,7 +266,7 @@ app.service('ParseConnector', function($q) {
                         }
 
                         _newRecord.populateAttribute = function(attribute) {            //FUNCTION WHICH PULLS IN RELATIONSHIP DATA
-
+                                
                                 var get_target_record = function() {
 
                                         if(typeof _model.attributes[attribute].link_to=="string") {
@@ -280,24 +279,31 @@ app.service('ParseConnector', function($q) {
 
                                         } else if(typeof _model.attributes[attribute].link_to=="object") {        
 
-                                                if(_newRecord[attribute].length) {
-                                                        _newRecord[attribute].forEach(function(id,index) {
-                                                                _newRecord[attribute][index]=_model.parent[foreign_table].filterBy({id:id})[0] || _newRecord[attribute]
+                                                _newRecord[attribute] = {
+                                                        data: _newRecord[attribute]                                                       
+                                                }
+                                                                                                
+                                                if(_newRecord[attribute].data.length>0) {
+                                                        _newRecord[attribute].data.forEach(function(id,index) {
+                                                                _newRecord[attribute].data[index]=_model.parent[foreign_table].filterBy({id:id})[0] || _newRecord[attribute]
                                                         })
 
                                                         field_specific_promise.resolve()                                        
 
 
-                                                } else {
+                                                } else if (_newRecord[attribute].data.key) {
+                                                                                                                
                                                         _newRecord.parseObject.relation(attribute).query().find().then(function(results){
-                                                                _newRecord[attribute] = []
+                                                                _newRecord[attribute].data = []
                                                                 results.forEach(function(result) {                                                                        
-                                                                        _newRecord[attribute].push(
+                                                                        _newRecord[attribute].data.push(
                                                                                 _model.parent[foreign_table].filterBy({id:result.id})[0] || results.id
                                                                         )
                                                                 })
                                                                 field_specific_promise.resolve()                                                                                                        
                                                         })
+                                                } else {
+                                                        field_specific_promise.resolve()  
                                                 }
 
                                         }
@@ -326,7 +332,6 @@ app.service('ParseConnector', function($q) {
 
                                         promises =[]
 
-
                                         for(attribute in _model.attributes) {
 
                                                 //VALDATIONS - REQUIRED FIELD
@@ -334,28 +339,34 @@ app.service('ParseConnector', function($q) {
 
                                                 //VALIDATIONS - UNIQUE FIELD
                                                 if(_model.attributes[attribute].unique) {
+
                                                         var query = new Parse.Query(_model.table)
-                                                        query.equalTo(attribute, _newRecord[attribute])
+                                                        query.equalTo(attribute, _newRecord[attribute])                                                       
+                                                        if(_newRecord.id) query.notEqualTo("objectId", _newRecord.id);
                                                         var unique_promise = $q.defer()
+                                                        unique_promise.attribute=attribute
                                                         promises.push(unique_promise.promise)
                                                         query.count().then(function(record_count) {
-                                                                if(record_count>0)  error_messages+="- " + attribute + " must be a unique value";
+                                                                if(record_count>0)  error_messages+="- " + unique_promise.attribute + " must be a unique value";
                                                                 unique_promise.resolve();
                                                         })
-                                                }                                               
+
+                                                }                                
+
                                         }
 
                                         $q.all(promises).then(function() {
+
                                                 if (error_messages) {
 
-                                                        _model.data.pop()
-
+                                                        _model.data.pop()                                                        
                                                         deferred.reject(error_messages)      
+
                                                 } else { findParseObject (); }
                                         })
                                 }
 
-                                var findParseObject = function () {
+                                var findParseObject = function () {       
                                         if(_newRecord.id) {                     //IF IT'S AN EXISTING RECORD     
                                                 if(_newRecord.parseObject) {            //and it has a parse record attached
                                                         performSave()
@@ -370,8 +381,17 @@ app.service('ParseConnector', function($q) {
 
                                 var performSave = function() {    
 
-                                        for (key in _model.attributes) {
-                                                if(key!="last_retrieved") {_newRecord.parseObject.set(key, _newRecord[key])}
+                                        for (attribute in _model.attributes) {
+
+                                                if(typeof _model.attributes[attribute].link_to=="string" && _newRecord[attribute]) {
+                                                        var refObj = new Parse.Object(_model.attributes[attribute].link_to)
+                                                        refObj.id=_newRecord[attribute].id
+                                                        _newRecord.parseObject.set(attribute, refObj)
+                                                } else if(typeof _model.attributes[attribute].link_to=="object") {
+                                                       
+                                                } else {                                                                                        
+                                                        _newRecord.parseObject.set(attribute, _newRecord[attribute])
+                                                }
                                         }
 
                                         _newRecord.parseObject.save().then(function(saved_record) {
@@ -382,7 +402,8 @@ app.service('ParseConnector', function($q) {
                                                 _model.cache()
 
                                                 deferred.resolve()
-                                        })
+
+                                        } )
 
                                 }
 
