@@ -230,7 +230,6 @@ app.service('ParseConnector', function($q) {
                                         data: data_to_cache
                                 }
 
-
                                 window.localStorage.setItem(_model.table, JSON.stringify(data_to_cache))
                                 console.info("- Saved to local cache ("+ _model.table +")")
                                 _model.relationship_update_deferral.resolve();             
@@ -266,7 +265,7 @@ app.service('ParseConnector', function($q) {
                         }
 
                         _newRecord.populateAttribute = function(attribute) {            //FUNCTION WHICH PULLS IN RELATIONSHIP DATA
-                                
+
                                 var get_target_record = function() {
 
                                         if(typeof _model.attributes[attribute].link_to=="string") {
@@ -280,9 +279,14 @@ app.service('ParseConnector', function($q) {
                                         } else if(typeof _model.attributes[attribute].link_to=="object") {        
 
                                                 _newRecord[attribute] = {
-                                                        data: _newRecord[attribute]                                                       
+                                                        data: _newRecord[attribute],    
+                                                        add: function(subrecord) {
+                                                                if(subrecord.id) {
+                                                                        _newRecord[attribute].data.push(subrecord)
+                                                                }                                                                
+                                                        }                                  
                                                 }
-                                                                                                
+
                                                 if(_newRecord[attribute].data.length>0) {
                                                         _newRecord[attribute].data.forEach(function(id,index) {
                                                                 _newRecord[attribute].data[index]=_model.parent[foreign_table].filterBy({id:id})[0] || _newRecord[attribute]
@@ -292,7 +296,7 @@ app.service('ParseConnector', function($q) {
 
 
                                                 } else if (_newRecord[attribute].data.key) {
-                                                                                                                
+
                                                         _newRecord.parseObject.relation(attribute).query().find().then(function(results){
                                                                 _newRecord[attribute].data = []
                                                                 results.forEach(function(result) {                                                                        
@@ -387,8 +391,24 @@ app.service('ParseConnector', function($q) {
                                                         var refObj = new Parse.Object(_model.attributes[attribute].link_to)
                                                         refObj.id=_newRecord[attribute].id
                                                         _newRecord.parseObject.set(attribute, refObj)
-                                                } else if(typeof _model.attributes[attribute].link_to=="object") {
-                                                       
+                                                } else if(_newRecord[attribute] && typeof _model.attributes[attribute].link_to=="object") {
+
+                                                        if(_newRecord[attribute].data) {
+
+                                                                var relation_field = _newRecord.parseObject.relation(attribute)
+
+                                                                _newRecord[attribute].data.forEach(function(subrecord) {
+
+                                                                        var refObj =  new (Parse.Object.extend(_model.attributes[attribute].link_to[0]))
+                                                                        refObj.id = subrecord.id
+
+                                                                        relation_field.add(refObj)
+
+                                                                })
+
+                                                        }
+
+
                                                 } else {                                                                                        
                                                         _newRecord.parseObject.set(attribute, _newRecord[attribute])
                                                 }
@@ -397,6 +417,11 @@ app.service('ParseConnector', function($q) {
                                         _newRecord.parseObject.save().then(function(saved_record) {
 
                                                 _newRecord.id = saved_record.id
+
+                                                if(_model.cache_promise.$$state.status==1) {
+                                                        _model.cache_deferral = $q.defer()
+                                                        _model.cache_promise=_model.cache_deferral.promise
+                                                }
 
                                                 _newRecord.last_retrieved=new Date().toISOString()
                                                 _model.cache()
