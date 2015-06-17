@@ -387,7 +387,14 @@ app.service('ParseConnector', function($q) {
 
                                         for (attribute in _model.attributes) {
 
-                                                if(typeof _model.attributes[attribute].link_to=="string" && _newRecord[attribute]) {
+                                                if(_model.attributes[attribute].type==="image" && _newRecord[attribute] ){
+                                                        
+                                                        if(_newRecord[attribute].substr(0,4)!="http") {
+                                                                _newRecord[attribute] = new Parse.File("myfile.jpg", { base64: _newRecord[attribute] });
+                                                                _newRecord.parseObject.set(attribute, _newRecord[attribute] || null)
+                                                        }
+                                                                                                                
+                                                } else if(typeof _model.attributes[attribute].link_to=="string" && _newRecord[attribute]) {
                                                         var refObj = new Parse.Object(_model.attributes[attribute].link_to)
                                                         refObj.id=_newRecord[attribute].id
                                                         _newRecord.parseObject.set(attribute, refObj)
@@ -418,6 +425,13 @@ app.service('ParseConnector', function($q) {
 
                                                 _newRecord.id = saved_record.id
 
+                                                for (attribute in _model.attributes) {
+                                                        if(_model.attributes[attribute].type==="image" && saved_record.get(attribute)){
+                                                                _newRecord[attribute]=saved_record.get(attribute).url()
+                                                        }
+
+                                                }
+                                                
                                                 if(_model.cache_promise.$$state.status==1) {
                                                         _model.cache_deferral = $q.defer()
                                                         _model.cache_promise=_model.cache_deferral.promise
@@ -469,8 +483,10 @@ app.service('ParseConnector', function($q) {
                                         for(attribute in _model.attributes) {   
 
                                                 if(_model.attributes.hasOwnProperty(attribute)) {
-
-                                                        if(_model.attributes[attribute].link_to && _newRecord.parseObject.get(attribute) ) {
+                                                        
+                                                        if(_model.attributes[attribute].type=="image" && _newRecord.parseObject.get(attribute)) {
+                                                                _newRecord[attribute]=_newRecord.parseObject.get(attribute).url();   
+                                                        } else if(_model.attributes[attribute].link_to && _newRecord.parseObject.get(attribute) ) {
                                                                 _newRecord[attribute] = _newRecord.parseObject.get(attribute) 
                                                                 _newRecord.populateAttribute(attribute);                                                                
                                                         } else {
