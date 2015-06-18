@@ -1,5 +1,5 @@
 angular.module("dataservices", [])
-.service('ParseConnector', function($q) {
+        .service('ParseConnector', function($q) {
 
         var apply_helper_functions = function(target) {
 
@@ -36,6 +36,9 @@ angular.module("dataservices", [])
         var __localcopy = {}
 
         var initialise = function(options) {                        //CONNECTS TO PARSE AND RETURNS A SHARED MODEL OBJECT
+
+                var deferred = $q.defer()
+
                 apply_helper_functions(options)
 
                 options.apply_defaults({})
@@ -43,7 +46,51 @@ angular.module("dataservices", [])
 
                 Parse.initialize(options.app_id, options.javascript_key);    
 
-                return __localcopy;
+                var create_user = function () {
+
+                        Parse.User.logOut();
+
+                        if(!(id=window.localStorage.getItem("key"))) {                
+                                id = typeof device !== 'undefined' ? device.uuid : "x" + (Math.random()*9999);
+                                window.localStorage.setItem("key", id);                
+                        }
+
+                        Parse.User.logIn(id, id, {
+                                success: function(user) {
+                                        console.info("signed in")
+                                        __localcopy.user = user
+                                        deferred.resolve(__localcopy)                                                                
+                                },
+                                error: function(user, error) {
+
+                                        var user = new Parse.User();
+                                        user.set("username", id);
+                                        user.set("password", id);                                
+
+                                        acl = new Parse.ACL()
+                                        //acl.setPublicReadAccess(true);
+                                        user.setACL(acl);                                
+
+                                        user.signUp(null, {
+                                                success: function(user) {
+                                                        console.info("registered");
+                                                        __localcopy.user = user
+                                                        deferred.resolve(__localcopy)      
+                                                },
+                                                error: function(user, error) {
+                                                        alert("A weird user error occurred!");  
+                                                        alert(error.message)
+                                                }
+                                        });
+                                }
+                        });
+
+                }()
+
+
+
+
+                return deferred.promise
         }
 
 
@@ -389,12 +436,12 @@ angular.module("dataservices", [])
                                         for (attribute in _model.attributes) {
 
                                                 if(_model.attributes[attribute].type==="image" && _newRecord[attribute] ){
-                                                        
+
                                                         if(_newRecord[attribute].substr(0,4)!="http") {
                                                                 _newRecord[attribute] = new Parse.File("myfile.jpg", { base64: _newRecord[attribute] });
                                                                 _newRecord.parseObject.set(attribute, _newRecord[attribute] || null)
                                                         }
-                                                                                                                
+
                                                 } else if(typeof _model.attributes[attribute].link_to=="string" && _newRecord[attribute]) {
                                                         var refObj = new Parse.Object(_model.attributes[attribute].link_to)
                                                         refObj.id=_newRecord[attribute].id
@@ -432,7 +479,7 @@ angular.module("dataservices", [])
                                                         }
 
                                                 }
-                                                
+
                                                 if(_model.cache_promise.$$state.status==1) {
                                                         _model.cache_deferral = $q.defer()
                                                         _model.cache_promise=_model.cache_deferral.promise
@@ -484,7 +531,7 @@ angular.module("dataservices", [])
                                         for(attribute in _model.attributes) {   
 
                                                 if(_model.attributes.hasOwnProperty(attribute)) {
-                                                        
+
                                                         if(_model.attributes[attribute].type=="image" && _newRecord.parseObject.get(attribute)) {
                                                                 _newRecord[attribute]=_newRecord.parseObject.get(attribute).url();   
                                                         } else if(_model.attributes[attribute].link_to && _newRecord.parseObject.get(attribute) ) {

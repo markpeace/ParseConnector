@@ -19,10 +19,14 @@ app.service('Models', function(ParseConnector, $q) {
         }()
 
 
-        var model = ParseConnector.initialise({
+        var model = {}
+        
+        ParseConnector.initialise({
                 app_id: "edND7HJo79GX6cn3r6hiArH5w6eioly1WPddottY",
                 javascript_key: "Tgozw1FvRVn8gGDKugHTXY6CRlwtDzfFH1Yet56I"
-        });
+        }).then(function(returned_model) {
+                model = returned_model
+        })
 
 
         definitions = {
