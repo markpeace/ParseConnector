@@ -11,7 +11,9 @@
         "private": true,
         "ignore": [          
                 "**/.*",
-                "*",
+                "js",
+                "index.html",
+                "pu.sh",
                 "node_modules",
                 "bower_components",
                 "test",
