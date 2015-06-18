@@ -1,4 +1,4 @@
-app = angular.module('app', ['ionic']);
+app = angular.module('app', ['ionic', 'dataservices']);
 
 app.config(function($stateProvider, $urlRouterProvider, $ionicConfigProvider) {
 

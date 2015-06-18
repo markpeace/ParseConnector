@@ -1,4 +1,5 @@
-app.service('ParseConnector', function($q) {
+angular.module("dataservices", [])
+.service('ParseConnector', function($q) {
 
         var apply_helper_functions = function(target) {
 
