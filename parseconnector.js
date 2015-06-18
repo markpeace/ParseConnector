@@ -622,6 +622,10 @@ angular.module("parseconnector", [])
                         _newRecord.construct();
                         return _newRecord
                 }
+                
+                _model.all = function() {
+                        return _model.data;
+                }
 
                 _model.filterBy = function (filter) {
                         filter=filter || {}
