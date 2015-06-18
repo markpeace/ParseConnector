@@ -112,6 +112,11 @@ angular.module("dataservices", [])
                         constraints: [],                        // query constraints
                         parse_update_delay: 60,                 // how long to wait between each check for parse updates (mins) 
                         time_offset: 30,                        // used to accomodate time differences between local and parse (mainly just for unit testing)
+                        acl: {
+                                public: {read:true, write:false},
+                                read_roles: ['superadministrator', 'administrator'],
+                                write_roles: ['superadministrator', 'administrator']
+                        },
                         //BUILT-IN VALUES      
                         parent: __localcopy,
                         last_retrieved: null,                   // timestamp indicating when data was last recached from parse     
@@ -421,14 +426,32 @@ angular.module("dataservices", [])
                                 var findParseObject = function () {       
                                         if(_newRecord.id) {                     //IF IT'S AN EXISTING RECORD     
                                                 if(_newRecord.parseObject) {            //and it has a parse record attached
-                                                        performSave()
+                                                        generateACL()
                                                 } else {                                //otherwise fetch the existing one
                                                         _newRecord.fetch(true).then(performSave)
                                                 }
                                         } else {                                //OTHERWISE CREATE A RECORD
                                                 _newRecord.parseObject = new (Parse.Object.extend(_model.table))
-                                                performSave();
+                                                generateACL();
                                         }
+                                }
+
+                                var generateACL = function() {
+                                        
+                                        var acl = new Parse.ACL();
+                                        
+                                        acl.setWriteAccess(__localcopy.user, true)
+                                        acl.setReadAccess(__localcopy.user, true)
+                                        
+                                        acl.setPublicReadAccess(_model.acl.public.read)
+                                        acl.setPublicWriteAccess(_model.acl.public.write)                                        
+                                        
+                                        _model.acl.read_roles.forEach(function(role) { acl.setRoleReadAccess(role,true) })
+                                        _model.acl.write_roles.forEach(function(role) { acl.setRoleWriteAccess(role,true) })
+                                        
+                                        _newRecord.parseObject.setACL(acl)
+                                        
+                                        performSave()
                                 }
 
                                 var performSave = function() {    
