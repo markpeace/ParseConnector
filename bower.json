@@ -1,0 +1,23 @@
+{
+  "name": "parseconnector",
+  "version": "0.0.1",
+  "homepage": "https://github.com/markpeace/ParseConnector",
+  "authors": [
+    "markpeace <mark@learnsomestuff.com>"
+  ],
+  "description": "Used to contact to parse from angularjs",
+  "main": "js/services/parseconnector.js",
+  "moduleType": [
+    "amd",
+    "es6"
+  ],
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}
