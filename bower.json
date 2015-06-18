@@ -14,7 +14,7 @@
                 "js",
                 "index.html",
                 "pu.sh",
-                "pages"
+                "pages",
                 "node_modules",
                 "bower_components",
                 "test",
