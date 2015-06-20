@@ -45,8 +45,6 @@ angular.module("parseconnector", [])
                 if ( e = options.enforce_requirements({ app_id: true, javascript_key: true }) ) { console.log(e); return; } 
 
                 Parse.initialize(options.app_id, options.javascript_key);    
-
-                __localcopy = options.model_object
                 
                 var create_user = function () {
 
