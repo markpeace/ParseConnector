@@ -23,7 +23,8 @@ app.service('Models', function(ParseConnector, $q) {
         
         ParseConnector.initialise({
                 app_id: "edND7HJo79GX6cn3r6hiArH5w6eioly1WPddottY",
-                javascript_key: "Tgozw1FvRVn8gGDKugHTXY6CRlwtDzfFH1Yet56I"
+                javascript_key: "Tgozw1FvRVn8gGDKugHTXY6CRlwtDzfFH1Yet56I",
+                model_object: model
         }).then(function(returned_model) {
                 model = returned_model
         })

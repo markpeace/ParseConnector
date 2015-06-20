@@ -46,6 +46,8 @@ angular.module("parseconnector", [])
 
                 Parse.initialize(options.app_id, options.javascript_key);    
 
+                __localcopy = options.model_object
+                
                 var create_user = function () {
 
                         Parse.User.logOut();
