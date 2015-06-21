@@ -20,7 +20,7 @@ app.service('Models', function(ParseConnector, $q) {
 
 
         var model = {}
-        
+
         ParseConnector.initialise({
                 app_id: "edND7HJo79GX6cn3r6hiArH5w6eioly1WPddottY",
                 javascript_key: "Tgozw1FvRVn8gGDKugHTXY6CRlwtDzfFH1Yet56I"
@@ -641,6 +641,24 @@ app.service('Models', function(ParseConnector, $q) {
                                 return  deferred.promise
                         } 
                 },
+                {
+                        title: "fields with a one-to-many attribute should have an add function",
+                        doTest: function() {
+                                var deferred = $q.defer()
+
+                                model.chapter = new ParseConnector.Model(definitions.chapter)
+                                model.book = new ParseConnector.Model(definitions.book)
+
+                                $q.all([model.chapter.update_promise, model.book.update_promise]).then(function() {
+                                        assert(typeof model.book.data[0].chapters).should_not.equal("undefined")
+                                                .then().process_promise(deferred,true, "could not find add function")
+
+                                })                                
+
+                                return deferred.promise
+                        }
+
+                },
                 { 
                         title: "fields with a *one-to-many attribute ( link_to:['table'] ), should automatically populate",
                         doTest: function() {
@@ -652,8 +670,7 @@ app.service('Models', function(ParseConnector, $q) {
 
                                 var prepopulate = function() { 
 
-                                        model.chapter = new ParseConnector.Model(definitions.chapter)
-                                        $q.all([model.chapter.update_promise, target_book.fetch()]).then(function() {
+                                        $q.when(target_book.fetch()).then(function() {
 
                                                 var prepopulation_promises = []
 

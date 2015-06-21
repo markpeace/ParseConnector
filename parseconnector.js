@@ -45,7 +45,7 @@ angular.module("parseconnector", [])
                 if ( e = options.enforce_requirements({ app_id: true, javascript_key: true }) ) { console.log(e); return; } 
 
                 Parse.initialize(options.app_id, options.javascript_key);    
-                
+
                 var create_user = function () {
 
                         Parse.User.logOut();
@@ -302,18 +302,18 @@ angular.module("parseconnector", [])
                         _model.data.push(_newRecord)
 
                         _newRecord.construct = function() {
+                                
                                 if (preset.cid) {                               //A PARSE OBJECT HAS BEEN PASSED
-                                        _newRecord.parseObject = preset
-                                } else {                                        //A BRAND NEW OR CACHED OBJECT HAS BEEN PASSED 
-
-                                        for(attribute in _model.attributes) {
-
-                                                _newRecord[attribute]=preset[attribute]
-
-                                                if(_model.attributes[attribute].link_to && _newRecord[attribute]) _newRecord.populateAttribute(attribute);
-                                        }
-
+                                        _newRecord.parseObject = preset                                        
                                 }
+                                
+                                for(attribute in _model.attributes) {
+
+                                        if(!preset.cid) _newRecord[attribute]=preset[attribute];
+                                        
+                                        if(_model.attributes[attribute].link_to) _newRecord.populateAttribute(attribute);
+                                }
+                                
 
                         }
 
@@ -321,7 +321,7 @@ angular.module("parseconnector", [])
 
                                 var get_target_record = function() {
 
-                                        if(typeof _model.attributes[attribute].link_to=="string") {
+                                        if(typeof _model.attributes[attribute].link_to=="string"  && _newRecord[attribute]) {
 
                                                 _newRecord[attribute] = _newRecord[attribute].id || _newRecord[attribute]
 
@@ -332,7 +332,7 @@ angular.module("parseconnector", [])
                                         } else if(typeof _model.attributes[attribute].link_to=="object") {        
 
                                                 _newRecord[attribute] = {
-                                                        data: _newRecord[attribute],    
+                                                        data: _newRecord[attribute] || [],    
                                                         add: function(subrecord) {
                                                                 if(subrecord.id) {
                                                                         _newRecord[attribute].data.push(subrecord)
@@ -363,6 +363,8 @@ angular.module("parseconnector", [])
                                                         field_specific_promise.resolve()  
                                                 }
 
+                                        } else {
+                                                field_specific_promise.resolve()
                                         }
 
                                 }
@@ -437,20 +439,20 @@ angular.module("parseconnector", [])
                                 }
 
                                 var generateACL = function() {
-                                        
+
                                         var acl = new Parse.ACL();
-                                        
+
                                         acl.setWriteAccess(__localcopy.user, true)
                                         acl.setReadAccess(__localcopy.user, true)
-                                        
+
                                         acl.setPublicReadAccess(_model.acl.public.read)
                                         acl.setPublicWriteAccess(_model.acl.public.write)                                        
-                                        
+
                                         _model.acl.read_roles.forEach(function(role) { acl.setRoleReadAccess(role,true) })
                                         _model.acl.write_roles.forEach(function(role) { acl.setRoleWriteAccess(role,true) })
-                                        
+
                                         _newRecord.parseObject.setACL(acl)
-                                        
+
                                         performSave()
                                 }
 
@@ -622,7 +624,7 @@ angular.module("parseconnector", [])
                         _newRecord.construct();
                         return _newRecord
                 }
-                
+
                 _model.all = function() {
                         return _model.data;
                 }
