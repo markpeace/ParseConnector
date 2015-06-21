@@ -650,6 +650,7 @@ app.service('Models', function(ParseConnector, $q) {
                                 model.book = new ParseConnector.Model(definitions.book)
 
                                 $q.all([model.chapter.update_promise, model.book.update_promise]).then(function() {
+                                                                                
                                         assert(typeof model.book.data[0].chapters).should_not.equal("undefined")
                                                 .then().process_promise(deferred,true, "could not find add function")
 

@@ -451,7 +451,7 @@ angular.module("parseconnector", [])
                                         _model.acl.read_roles.forEach(function(role) { acl.setRoleReadAccess(role,true) })
                                         _model.acl.write_roles.forEach(function(role) { acl.setRoleWriteAccess(role,true) })
 
-                                        _newRecord.parseObject.setACL(acl)
+                                        if(_model.table!="User") _newRecord.parseObject.setACL(acl);
 
                                         performSave()
                                 }
