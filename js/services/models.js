@@ -39,6 +39,16 @@ app.service('Models', function(ParseConnector, $q) {
                                 cover: { type: 'image' },
                                 type: {},
                                 chapters: { link_to: ['Chapter'] }
+                        },
+                        class_methods: {
+                                testClassMethod: function() {
+                                        return true
+                                }
+                        },
+                        methods: {
+                                testMethod: function() {
+                                        return true
+                                }
                         }
 
                 },
@@ -193,7 +203,24 @@ app.service('Models', function(ParseConnector, $q) {
 
                                 return  deferred.promise
                         } 
-                },            
+                },      
+
+                { 
+                        title: "should allow custom methods",
+                        doTest: function() {
+                                var deferred = $q.defer()
+
+                                assert(typeof model.book.testClassMethod).should.equal("function")
+                                        .then().process_promise(deferred, false, "class level methods weren't found (!actual!)")
+
+
+                                assert(typeof model.book.data[0].testMethod).should.equal("function")
+                                        .then().process_promise(deferred, true, "record level methods weren't found")
+
+                                return  deferred.promise
+                        } 
+                },
+
                 { 
                         title: "if a *required field* isn't provided, records should not save",
                         doTest: function() {
@@ -650,7 +677,7 @@ app.service('Models', function(ParseConnector, $q) {
                                 model.book = new ParseConnector.Model(definitions.book)
 
                                 $q.all([model.chapter.update_promise, model.book.update_promise]).then(function() {
-                                                                                
+
                                         assert(typeof model.book.data[0].chapters).should_not.equal("undefined")
                                                 .then().process_promise(deferred,true, "could not find add function")
 

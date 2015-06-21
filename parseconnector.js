@@ -109,6 +109,8 @@ angular.module("parseconnector", [])
                         table: null,                            // parse table to draw data from
                         attributes: {},                         // definition of fields within the table
                         //OPTIONAL VALUES
+                        class_methods: {},
+                        methods: {},
                         constraints: [],                        // query constraints
                         parse_update_delay: 60,                 // how long to wait between each check for parse updates (mins) 
                         time_offset: 30,                        // used to accomodate time differences between local and parse (mainly just for unit testing)
@@ -137,6 +139,11 @@ angular.module("parseconnector", [])
 
                 for (key in options) { _model[key] = options[key] }
                 _model.data = new Array();
+                
+                for(key in _model.class_methods) {
+                        _model[key]=_model.class_methods[key]
+                }
+                
                 console.info("Created model which wraps table: " + _model.table)
 
                 _model.recache = function () {
@@ -312,6 +319,10 @@ angular.module("parseconnector", [])
                                         if(!preset.cid) _newRecord[attribute]=preset[attribute];
                                         
                                         if(_model.attributes[attribute].link_to) _newRecord.populateAttribute(attribute);
+                                }
+                                
+                                for(key in _model.methods) {
+                                        _newRecord[key]=_model.methods[key]
                                 }
                                 
 
