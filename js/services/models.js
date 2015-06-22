@@ -36,6 +36,7 @@ app.service('Models', function(ParseConnector, $q) {
                         attributes: {
                                 title: { required: true, unique: true },                                
                                 author: { link_to: 'Author' },
+                                authors: { link_to: ['Author']},
                                 cover: { type: 'image' },
                                 type: {},
                                 chapters: { link_to: ['Chapter'] }
@@ -56,7 +57,8 @@ app.service('Models', function(ParseConnector, $q) {
                         table: 'Author',
                         parse_update_delay: 0,
                         attributes: {
-                                name: { required: true }
+                                name: { required: true },
+                                books: { link_to: ['Book'] }
                         }
                 },
                 chapter: {
@@ -220,7 +222,6 @@ app.service('Models', function(ParseConnector, $q) {
                                 return  deferred.promise
                         } 
                 },
-
                 { 
                         title: "if a *required field* isn't provided, records should not save",
                         doTest: function() {
@@ -853,7 +854,63 @@ app.service('Models', function(ParseConnector, $q) {
                         doTest: function() {
                                 var deferred = $q.defer()
 
-                                deferred.resolve()                               
+                                var target_author=model.author.data[0]
+                                var target_book=model.book.filterBy({title:"Book One"})[0]
+
+                                target_author.books.add(target_book)
+                                target_book.authors.add(target_author)
+
+                                $q.all([target_author.save(), target_book.save()]).then(function() {
+
+                                        assert(target_author.books.data.length).should.equal(1)
+                                                .then().process_promise(deferred, false, "book wasn't added to authors books in the first instance")
+
+                                        assert(target_book.authors.data.length).should.equal(1)
+                                                .then().process_promise(deferred, false, "author wasn't added to books multi-authors in the first instance")
+
+                                        model.book.recache(); 
+                                        model.author.recache();
+
+                                        $q.all([model.book.cache_promise, model.author.cache_promise]).then(function() {
+
+                                                var target_author=model.author.data[0]
+                                                var target_book=model.book.filterBy({title:"Book One"})[0]
+
+                                                assert(target_author.books.data.length).should.equal(1)
+                                                        .then().process_promise(deferred, false, "book wasn't added to authors books after recache")
+
+                                                assert(target_book.authors.data.length).should.equal(1)
+                                                        .then().process_promise(deferred, false, "author wasn't added to books multi-authors 5after recache")
+
+
+                                                window.localStorage.removeItem(model.book.table)
+                                                window.localStorage.removeItem(model.author.table)
+
+                                                model.book.recache(); 
+                                                model.author.recache();
+
+                                                $q.all([model.book.cache_promise, model.author.cache_promise]).then(function() {
+
+                                                        var target_author=model.author.data[0]
+                                                        var target_book=model.book.filterBy({title:"Book One"})[0]
+
+                                                        assert(target_author.books.data.length).should.equal(1)
+                                                                .then().process_promise(deferred, false, "book wasn't added to authors books after parse recache")
+
+                                                        assert(target_book.authors.data.length).should.equal(1)
+                                                                .then().process_promise(deferred, true, "author wasn't added to books multi-authors 5after parse recache")
+
+
+
+                                                        console.log(target_author)
+                                                        console.log(target_book)
+
+                                                })
+
+                                        })
+
+
+                                })
 
                                 return  deferred.promise
                         } 
