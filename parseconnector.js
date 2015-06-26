@@ -272,11 +272,15 @@ angular.module("parseconnector", [])
                                         for(attribute in _model.attributes) {
 
                                                 if(typeof record[attribute]==="object" ) {
+
                                                         if(!(record_to_cache[attribute] = record[attribute].id) ) {
-                                                                if(record[attribute].data) {
+                                                                if(!_model.attributes[attribute].link_to) {
+                                                                        record_to_cache[attribute]=record[attribute]
+                                                                } else if(record[attribute].data) {                                                                        
                                                                         record_to_cache[attribute]=record[attribute].data.map(function(r) { return r.id })
-                                                                }
+                                                                } 
                                                         }
+
                                                 } else {
                                                         record_to_cache[attribute] = record[attribute]
                                                 }
@@ -285,6 +289,7 @@ angular.module("parseconnector", [])
 
                                         data_to_cache.push(record_to_cache)
                                 })
+
 
                                 data_to_cache = {
                                         last_retrieved: _model.last_retrieved,
@@ -332,7 +337,7 @@ angular.module("parseconnector", [])
                         _newRecord.populateAttribute = function(attribute) {            //FUNCTION WHICH PULLS IN RELATIONSHIP DATA
 
                                 var get_target_record = function() {
-                                        
+
                                         if(typeof _model.attributes[attribute].link_to=="string"  && _newRecord[attribute]) {
 
                                                 _newRecord[attribute] = _newRecord[attribute].id || _newRecord[attribute]
