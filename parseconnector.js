@@ -352,7 +352,11 @@ angular.module("parseconnector", [])
                                                         data: _newRecord[attribute] || [],    
                                                         add: function(subrecord) {
                                                                 if(subrecord.id) {
-                                                                        _newRecord[attribute].data.push(subrecord)
+                                                                        
+                                                                        exists = false
+                                                                        _newRecord[attribute].data.forEach(function(r) { if(r.id==subrecord.id) exists=true; })                                                                        
+                                                                        if(!exists) _newRecord[attribute].data.push(subrecord);
+                                                                        
                                                                 }                                                                
                                                         }                                  
                                                 }
