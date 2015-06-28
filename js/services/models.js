@@ -838,7 +838,49 @@ app.service('Models', function(ParseConnector, $q) {
 
                                 return  deferred.promise
                         } 
-                },                             
+                },                    
+                {
+                        title: "one to many objects should have a .remove method",
+                        doTest:function(){
+                                var deferred = $q.defer()
+
+                                var target_author=model.author.data[0]
+
+                                var target_book = model.book.filterBy({title: 'Book Three'})[0]
+
+                                target_book.authors.add(target_author)
+                                
+                                target_book.save().then(function() {
+                                                                      
+                                        var target_book = model.book.filterBy({title: 'Book Three'})[0]
+                                        target_book.authors.remove(target_author)
+
+                                        assert(target_book.authors.data.length).should.equal(0)
+                                                .then().process_promise(deferred, false, "the relationship wasn't removed pre-save (length was !actual!)")
+                                                
+                                        target_book.save().then(function() {
+
+                                                window.localStorage.removeItem(model.book.table)
+                                                window.localStorage.removeItem(model.author.table)
+                                                
+                                                model.book.recache()
+                                                model.author.recache()
+                                                $q.all([model.book.cache_promise, model.author.cache_promise]).then(function() {                                                       
+                                                        var target_book = model.book.filterBy({title: 'Book Three'})[0]
+                                                        assert(target_book.authors.data.length).should.equal(0)
+                                                                .then().process_promise(deferred,true, "the relationship wasn't removed (count was !actual!)")
+                                                })
+
+                                        })
+                                        
+                                        
+                                })
+
+
+                                return deferred.promise
+                        }
+
+                },
                 { 
                         title: "###when an object associated with a one-to-many attribute is deleted, it should be dynamically removed from that attribute",
                         doTest: function() {

@@ -352,13 +352,35 @@ angular.module("parseconnector", [])
                                                         data: _newRecord[attribute] || [],    
                                                         add: function(subrecord) {
                                                                 if(subrecord.id) {
-                                                                        
+
                                                                         exists = false
                                                                         _newRecord[attribute].data.forEach(function(r) { if(r.id==subrecord.id) exists=true; })                                                                        
                                                                         if(!exists) _newRecord[attribute].data.push(subrecord);
-                                                                        
+
                                                                 }                                                                
-                                                        }                                  
+                                                        },
+                                                        remove: function(subrecord) {
+
+                                                                var target
+                                                                var target_index
+                                                                _newRecord[attribute].data.forEach(function(existing_subrecord,index) {
+                                                                        if (existing_subrecord.id==subrecord.id) {
+                                                                                target=existing_subrecord
+                                                                                target_index=index
+                                                                        }
+                                                                })
+
+                                                                if(target_index>-1) {
+
+                                                                        _newRecord[attribute].data.splice(target_index,1)
+
+                                                                        var relation = _newRecord.parseObject.relation(attribute)
+                                                                        var faux_object = new Parse.Object(_model.attributes[attribute].link_to[0])
+                                                                        faux_object.id = subrecord.id
+                                                                        relation.remove(faux_object);
+                                                                }
+
+                                                        }
                                                 }
 
                                                 if(_newRecord[attribute].data.length>0) {
@@ -525,7 +547,8 @@ angular.module("parseconnector", [])
 
                                         _newRecord.parseObject.save().then(function(saved_record) {
 
-                                                _newRecord.id = saved_record.id
+                                                _newRecord.id = saved_record.id                                                
+                                                _newRecord.parseObject=saved_record
 
                                                 for (attribute in _model.attributes) {
                                                         if(_model.attributes[attribute].type==="image" && saved_record.get(attribute)){
