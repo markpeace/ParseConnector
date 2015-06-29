@@ -117,8 +117,8 @@ angular.module("parseconnector", [])
                         delay_relationship_load: false,        // set to true when a model is being created before its relationships 
                         acl: {
                                 public: {read:true, write:false},
-                                read_roles: ['superadministrator', 'administrator'],
-                                write_roles: ['superadministrator', 'administrator']
+                                read_roles: ['Superadministrator', 'Administrator'],
+                                write_roles: ['Superadministrator', 'Administrator']
                         },
                         //BUILT-IN VALUES      
                         parent: __localcopy,
