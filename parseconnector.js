@@ -277,7 +277,7 @@ angular.module("parseconnector", [])
                                                                 if(!_model.attributes[attribute].link_to) {
                                                                         record_to_cache[attribute]=record[attribute]
                                                                 } else if(record[attribute].data) {                                                                        
-                                                                        record_to_cache[attribute]=record[attribute].data.map(function(r) { return r.id })
+                                                                        record_to_cache[attribute]=record[attribute].data.map(function(r) { return r ? r.id : undefined })
                                                                 } 
                                                         }
 
