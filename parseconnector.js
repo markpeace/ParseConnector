@@ -68,6 +68,8 @@ angular.module("parseconnector", [])
                                         user.set("password", id);                                
 
                                         acl = new Parse.ACL()
+                                        acl.setRoleReadAccess("Superadministrator", true)
+                                        acl.setRoleReadAccess("Administrator", true)
                                         //acl.setPublicReadAccess(true);
                                         user.setACL(acl);                                
 
