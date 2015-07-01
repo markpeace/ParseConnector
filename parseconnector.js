@@ -447,7 +447,7 @@ angular.module("parseconnector", [])
                                         for(attribute in _model.attributes) {
 
                                                 //VALDATIONS - REQUIRED FIELD
-                                                if(_model.attributes[attribute].required && !_newRecord[attribute]) error_messages=error_messages+"- a value must be provided for"+attribute;                                                        
+                                                if(_model.attributes[attribute].required && !_newRecord[attribute]) error_messages=error_messages+"- a value must be provided for "+attribute+"\n";                                                        
 
                                                 //VALIDATIONS - UNIQUE FIELD
                                                 if(_model.attributes[attribute].unique) {
