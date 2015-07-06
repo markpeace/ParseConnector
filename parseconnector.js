@@ -183,8 +183,7 @@ angular.module("parseconnector", [])
 
                                 if(new Date(next_retrieval).getTime() > new Date().getTime()) {
                                         console.info("- Parse updated skipped for " + _model.table)
-                                        //_model.update_deferral.resolve();
-                                        deferred.resolve();
+                                        do_final_bits();
                                         return;
                                 }
 
