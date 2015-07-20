@@ -272,7 +272,7 @@ angular.module("parseconnector", [])
 
                                         for(attribute in _model.attributes) {
 
-                                                if(typeof record[attribute]==="object" ) {
+                                                if(typeof record[attribute]==="object" && record[attribute]) {
 
                                                         if(!(record_to_cache[attribute] = record[attribute].id) ) {
                                                                 if(!_model.attributes[attribute].link_to) {
